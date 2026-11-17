@@ -43,8 +43,9 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _state.update { it.copy(checking = true, error = null) }
             val result = runCatching {
-                // Makay Cleaner gibi açılışta 12 saatlik kontrol aralığına uy.
-                withContext(Dispatchers.IO) { repository.checkForUpdate(force = false) }
+                // Her uygulama oturumu açılışında en son Release'i denetle.
+                // Manuel kontrolden kalan 12 saatlik kayıt açılış uyarısını engellememeli.
+                withContext(Dispatchers.IO) { repository.checkForUpdate(force = true) }
             }
             val update = result.getOrNull()
             if (update != null && !postponedThisSession) {
