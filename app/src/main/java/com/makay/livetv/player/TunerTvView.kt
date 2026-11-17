@@ -158,6 +158,12 @@ class TunerPlayerController(
                 -> Unit // henuz hazir degil; tune tekrar denemesi devrede
 
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL -> {
+                    // OEM TIF can report a temporary weak signal while the
+                    // initial tune is still settling. Don't replace the live
+                    // surface with an error before playback has ever started.
+                    if (!hasConfirmedPlayback && tuneInProgress &&
+                        SystemClock.elapsedRealtime() - tuneStartedAtMs < INITIAL_SIGNAL_GRACE_MS
+                    ) return
                     tuneInProgress = false
                     onState(PlaybackState.Error(ch, str(R.string.err_weak_signal)))
                 }
@@ -428,6 +434,7 @@ class TunerPlayerController(
 
     companion object {
         private const val TAG = "TunerPlayer"
+        private const val INITIAL_SIGNAL_GRACE_MS = 4_000L
         private const val ACTION_FULLPAGE_TELETEXT = "com.google.android.tv.dtvinput.play.mode.FULLPAGE_TELETEXT"
 
         /** Yaygin dil kodlari (ISO 639-1/2) → dilin kendi yazimi. */

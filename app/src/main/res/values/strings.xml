@@ -154,7 +154,7 @@
     <string name="timer_record_start">Kaydı başlat</string>
     <string name="timer_record_schedule">Programı kaydet</string>
     <string name="timer_repeat_weekly">Her hafta tekrarla</string>
-    <string name="err_tune_timeout">Yayın zamanında açılamadı. Sinyali ve tuner durumunu kontrol edin.</string>
+    <string name="err_tune_timeout">Kanal zamanında açılamadı. Tuner yanıt vermedi.</string>
     <string name="timer_weekly_badge">Haftalık</string>
     <string name="epg_search_hint">Kanal veya program ara</string>
     <string name="timer_record_ready">Seçili TV girişi kayıt destekliyor</string>

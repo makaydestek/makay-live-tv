@@ -148,7 +148,7 @@
     <string name="timer_record_start">Start recording</string>
     <string name="timer_record_schedule">Record programme</string>
     <string name="timer_repeat_weekly">Repeat weekly</string>
-    <string name="err_tune_timeout">The channel did not start in time. Check the signal and tuner status.</string>
+    <string name="err_tune_timeout">The channel did not start in time. The tuner did not respond.</string>
     <string name="timer_weekly_badge">Weekly</string>
     <string name="epg_search_hint">Search channels or programmes</string>
     <string name="timer_record_ready">Selected TV input supports recording</string>

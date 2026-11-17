@@ -177,7 +177,6 @@ fun AppRoot(
 
     var playbackState by remember { mutableStateOf<PlaybackState>(PlaybackState.Idle) }
     var controller by remember { mutableStateOf<TunerPlayerController?>(null) }
-    var signalStrength by remember { mutableStateOf<Int?>(null) }
     var trackState by remember { mutableStateOf(TrackState()) }
     var timeShiftState by remember { mutableStateOf(TimeShiftState()) }
     var bannerVisible by remember { mutableStateOf(false) }
@@ -289,12 +288,6 @@ fun AppRoot(
         })
     }
     LaunchedEffect(controller) {
-        val ready = controller ?: run { signalStrength = null; return@LaunchedEffect }
-        ready.signalStrength.collect(object : kotlinx.coroutines.flow.FlowCollector<Int?> {
-            override suspend fun emit(value: Int?) { signalStrength = value }
-        })
-    }
-    LaunchedEffect(controller) {
         val ready = controller ?: return@LaunchedEffect
         ready.timeShiftState.collect(object : kotlinx.coroutines.flow.FlowCollector<TimeShiftState> {
             override suspend fun emit(value: TimeShiftState) { timeShiftState = value }
@@ -366,7 +359,6 @@ fun AppRoot(
 
         else -> LiveTvScreen(
             activeChannel = if (ageBlockedProgram == null) activeChannel else null,
-            signalStrength = signalStrength,
             channelsLoading = channelsLoading,
             epg = if (ageBlockedProgram == null) activeChannel?.let { epgMap[it.id] } else null,
             playbackState = playbackState,

@@ -1,6 +1,5 @@
 package com.makay.livetv.ui
 
-import android.media.tv.TvInputManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -75,7 +74,6 @@ import com.makay.livetv.util.TimeFormat
 @Composable
 fun LiveTvScreen(
     activeChannel: Channel?,
-    signalStrength: Int?,
     channelsLoading: Boolean,
     epg: ChannelEpg?,
     playbackState: PlaybackState,
@@ -155,7 +153,7 @@ fun LiveTvScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             activeChannel?.let {
-                InfoBanner(channel = it, epg = epg, signalStrength = signalStrength)
+                InfoBanner(channel = it, epg = epg)
             }
         }
 
@@ -350,7 +348,6 @@ private val forwardedKeyCodes = setOf(
 private fun InfoBanner(
     channel: Channel,
     epg: ChannelEpg?,
-    signalStrength: Int?,
 ) {
     val now = System.currentTimeMillis()
     Box(
@@ -435,71 +432,6 @@ private fun InfoBanner(
                     )
                 }
             }
-            Spacer(Modifier.height(7.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val signalLabel = when (signalStrength) {
-                    TvInputManager.SIGNAL_STRENGTH_STRONG -> stringResource(R.string.signal_level_strong)
-                    TvInputManager.SIGNAL_STRENGTH_WEAK -> stringResource(R.string.signal_level_weak)
-                    TvInputManager.SIGNAL_STRENGTH_LOST -> stringResource(R.string.signal_level_lost)
-                    else -> stringResource(R.string.signal_level_unknown)
-                }
-                SignalMetric(
-                    label = stringResource(R.string.signal_label),
-                    value = signalLabel,
-                    strength = signalStrength,
-                )
-                SignalMetric(
-                    label = stringResource(R.string.signal_quality_label),
-                    value = stringResource(R.string.signal_quality_unavailable),
-                    strength = null,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SignalMetric(label: String, value: String, strength: Int?) {
-    val segmentCount = when (strength) {
-        TvInputManager.SIGNAL_STRENGTH_STRONG -> 3
-        TvInputManager.SIGNAL_STRENGTH_WEAK -> 1
-        else -> 0
-    }
-    val levelColor = when (strength) {
-        TvInputManager.SIGNAL_STRENGTH_STRONG -> Color(0xFF4ED18A)
-        TvInputManager.SIGNAL_STRENGTH_WEAK -> Color(0xFFFFC66D)
-        TvInputManager.SIGNAL_STRENGTH_LOST -> Color(0xFFFF7777)
-        else -> Color(0xFF8595A8)
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, color = Color(0xFF8595A8), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            if (strength == null) {
-                Text("—", color = Color(0xFF8595A8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    repeat(3) { index ->
-                        Box(
-                            Modifier
-                                .size(width = 5.dp, height = 10.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(if (index < segmentCount) levelColor else Color(0xFF4B5868)),
-                        )
-                    }
-                }
-            }
-            Text(
-                value,
-                color = if (strength == TvInputManager.SIGNAL_STRENGTH_WEAK || strength == TvInputManager.SIGNAL_STRENGTH_LOST) levelColor else Color(0xFFB8C9DC),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
@@ -507,7 +439,6 @@ private fun SignalMetric(label: String, value: String, strength: Int?) {
 @Composable
 private fun ChannelTags(channel: Channel) {
     val tags = buildList {
-        if (channel.type.isPhysicalTuner) add(channel.type.label)
         if (channel.isHd) add(stringResource(R.string.tag_hd))
         if (channel.isRadio) add(stringResource(R.string.tag_radio))
         if (channel.isFavorite) add("★ " + stringResource(R.string.favorites).uppercase())
