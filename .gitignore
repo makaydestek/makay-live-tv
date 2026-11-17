@@ -1,0 +1,40 @@
+# Built application files
+*.apk
+*.apk.sha256
+# R8 obfuscation haritasi - APK ile ayni klasorde durur, repoya girmez
+*-mapping.txt
+*.ap_
+*.aab
+
+# Gradle / IDE
+.gradle/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+captures/
+.externalNativeBuild/
+*.hprof
+.DS_Store
+*.log
+.kotlin/
+APK/*.log
+APK/build-*.txt
+APK/CURRENT.txt
+APK/APK-Hazirla-last.log
+
+# Keystores - never commit
+*.jks
+*.keystore
+
+# APK analiz calismalari
+_analysis/
+analysis/
+
+# Yerel TV ekran goruntuleri / gecici arac klasorleri
+/*.png
+/1.0.16
+/null/
+/PowerShell 7.6.9/

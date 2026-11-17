@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Makay Live TV</string>
+
+    <!-- Kanallar -->
+    <string name="channels">Kanallar</string>
+    <string name="channel_list">Kanal Listesi</string>
+    <string name="menu_tab">Menü</string>
+    <string name="recordings_tab">Kayıt</string>
+    <string name="menu_search_hint">⌕  Ara</string>
+    <string name="menu_setup">Kurulum</string>
+    <string name="menu_channel_edit">Kanal Düzenleme</string>
+    <string name="menu_pvr_list">PVR Listesi</string>
+    <string name="channel_not_found">Kanal bulunamadı</string>
+    <string name="live_no_channels_body">Canlı TV izlemek için cihazın DTV girişinde kanal taraması yapın.</string>
+    <string name="no_channels_title">Kanal listesi boş</string>
+    <string name="no_channels_body">Dahili tunerde kayıtlı kanal yok. Cihazın DTV girişinden kanal taraması yapın veya alttaki düğmeyi kullanın.</string>
+    <string name="no_tuner_title">Dahili tuner bulunamadı</string>
+    <string name="no_tuner_body">Bu cihazda Android TV girişi (TvInputService) görünmüyor. Uygulama yalnızca TIF destekli cihazlarda dahili tuneri kullanabilir.</string>
+    <string name="channel_number">Kanal</string>
+    <string name="loading">Yükleniyor…</string>
+
+    <!-- Oynatma durumu -->
+    <string name="player_tuning_channel">%1$s ayarlanıyor…</string>
+    <string name="err_weak_signal">Sinyal zayıf</string>
+    <string name="err_broadcast_unavailable">Yayın kullanılamıyor (kod %1$d)</string>
+    <string name="err_parental_blocked">Ebeveyn kilidi engelledi</string>
+    <string name="err_scrambled_ca">Şifreli kanal (CI/CA kartı gerekli)</string>
+    <string name="err_tuner_busy">Tuner meşgul</string>
+    <string name="err_player_not_ready">Oynatıcı hazır değil</string>
+    <string name="err_tune_failed">Kanal ayarlanamadı</string>
+
+    <!-- Menü / liste -->
+    <string name="favorites">Favoriler</string>
+    <string name="filter_all">Tüm kanallar</string>
+    <string name="filter_favorites">Yalnızca favoriler</string>
+    <string name="filter_radio">Radyo</string>
+    <string name="filter_hd">HD</string>
+    <string name="filter_hidden">Gizlenenler</string>
+    <string name="filter_recent">Son izlenenler</string>
+    <string name="sort_number">Numaraya göre</string>
+    <string name="sort_name">İsme göre</string>
+    <string name="sort_custom">Özel sıra</string>
+
+    <!-- EPG -->
+    <string name="epg_title">TV Rehberi</string>
+    <string name="epg_no_data">Program bilgisi yok</string>
+    <string name="epg_select_hint">Gün seçmek için ◀▶, izgaraya girmek için ▼, program detayı için OK tuşuna basın.</string>
+    <string name="epg_today">Bugün</string>
+    <string name="epg_tomorrow">Yarın</string>
+    <string name="epg_now">Şimdi</string>
+    <string name="epg_loading">Programlar yükleniyor…</string>
+    <string name="epg_no_programs_in_day">Bu gün için program verisi yok</string>
+    <string name="epg_detail_genre">Tür</string>
+    <string name="epg_detail_rating">Yaş sınırı</string>
+    <string name="epg_detail_duration">Süre</string>
+    <string name="epg_detail_description">Özet</string>
+    <string name="epg_no_description">Bu program için özet bulunmuyor.</string>
+    <string name="epg_watch">İzle</string>
+    <string name="epg_close">Kapat</string>
+    <string name="epg_hint_days">◀▶ Gün seç · ▼ İzgaraya geç · OK Şimdi</string>
+    <string name="epg_hint_grid">▲▼ Kanal · ◀▶ Program · OK Detay · ▲ Gün seçimi</string>
+
+    <!-- Oynatma secenekleri -->
+    <string name="playback_options">Oynatma Seçenekleri</string>
+    <string name="options_aspect">Görüntü modu</string>
+    <string name="aspect_full">16:9 Tam ekran</string>
+    <string name="aspect_pillar">4:3 Sütunlu</string>
+    <string name="options_audio_track">Ses izi</string>
+    <string name="options_subtitle_track">Altyazı</string>
+    <string name="track_off">Kapalı</string>
+    <string name="track_none">Bu yayında iz bulunamadı</string>
+    <string name="track_unknown_language">Bilinmeyen dil</string>
+
+    <!-- Ayarlar -->
+    <string name="settings">Ayarlar</string>
+    <string name="settings_about">Hakkında</string>
+    <string name="settings_about_app">Makay Live TV</string>
+    <string name="settings_installed_version_desc">Kurulu uygulama sürümü ve derleme numarası</string>
+    <string name="update_status_current">Güncelleme durumu doğrulanmadı. Denetle’ye basın.</string>
+    <string name="signal_level_value">Sinyal: %1$s</string>
+    <string name="signal_level_strong">Güçlü</string>
+    <string name="signal_level_weak">Zayıf</string>
+    <string name="signal_level_lost">Yok</string>
+    <string name="signal_level_unknown">Bilinmiyor</string>
+    <string name="signal_label">Sinyal</string>
+    <string name="signal_quality_label">Kalite</string>
+    <string name="signal_quality_unavailable">Tuner ölçüm sunmuyor</string>
+    <string name="channel_quick_access_hint">Sağ: filtre/sıralama · Aşağı: kanallara dön</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_dark">Koyu</string>
+    <string name="settings_theme_light">Açık</string>
+    <string name="settings_theme_system">Sistem</string>
+    <string name="settings_start_last_channel">Son kanalla başla</string>
+    <string name="settings_start_last_channel_desc">Uygulama açıldığında en son izlenen kanalı oynatır.</string>
+    <string name="settings_info_banner">Kanal bilgi çubuğu</string>
+    <string name="settings_info_banner_desc">Kanal değişiminde bilgi çubuğunu gösterir.</string>
+    <string name="settings_banner_timeout">Bilgi çubuğu süresi</string>
+    <string name="settings_channel_logo">Kanal logoları</string>
+    <string name="settings_channel_logo_desc">Kanal listesinde logo gösterir.</string>
+    <string name="settings_version">Sürüm</string>
+    <string name="settings_tuner_input">Aktif TV girişi</string>
+    <string name="settings_clear_recent">Son izlenenleri temizle</string>
+    <string name="settings_clear_recent_desc">Son izlenenler listesi ve son kanal kaydı silinir</string>
+    <string name="settings_platform">Platform</string>
+    <string name="settings_channel_count">Kanal sayısı</string>
+    <string name="settings_channel_count_desc">Sistem TV sağlayıcısından okunan kanal sayısı</string>
+    <string name="settings_version_name">Makay Live TV</string>
+    <string name="settings_platform_desc">android.media.tv (TIF) tabanlı dahili tuner</string>
+    <string name="platform_tif">TIF</string>
+    <string name="action_clear">Temizle</string>
+    <string name="action_scan_channels">Kanal tara / kurulum</string>
+    <string name="action_save">Kaydet</string>
+    <string name="channel_actions_hint">Kumanda ile favori durumunu değiştirin veya bu uygulamadaki kanal adını düzenleyin.</string>
+    <string name="channel_add_favorite">Favoriye ekle</string>
+    <string name="channel_remove_favorite">Favorilerden çıkar</string>
+    <string name="channel_rename">Adı düzenle</string>
+    <string name="channel_rename_title">Kanal adını düzenle</string>
+    <string name="channel_rename_hint">Yeni kanal adı</string>
+    <string name="channel_rename_reset">Orijinal ada dön</string>
+    <string name="channel_hide">Bu uygulamada gizle</string>
+    <string name="channel_unhide">Gizlemeyi kaldır</string>
+    <string name="channel_move_up">Yukarı taşı</string>
+    <string name="channel_move_down">Aşağı taşı</string>
+    <string name="channel_delete">Kanalı sil</string>
+    <string name="channel_skip">Zap’ta atla</string>
+    <string name="channel_unskip">Atlamayı kaldır</string>
+    <string name="channel_restore">Kanalları geri getir</string>
+    <string name="channel_restore_desc">Gizli ve silinen tüm kanallar listeye döner</string>
+    <string name="action_restore">Geri getir</string>
+    <string name="action_open">Aç</string>
+    <string name="timers_manage_desc">Kurulu program hatırlatmalarını görüntüle veya kaldır</string>
+    <string name="timers_count">%1$d etkin zamanlayıcı</string>
+    <string name="recordings_title">Kayıtlar</string>
+    <string name="recordings_empty">Henüz kayıt bulunamadı veya TV girdisi kayıt listesine erişim vermiyor.</string>
+    <string name="recordings_search_hint">Kayıtlarda ara</string>
+    <string name="recordings_sort_title">Ada göre</string>
+    <string name="recordings_sort_date">Tarihe göre</string>
+    <string name="recordings_storage_info">Uygulama depolama alanında boş: %1$s. Tuner kayıt konumunu ayrıca yönetebilir.</string>
+    <string name="diagnostics_title">Cihaz tanılama</string>
+    <string name="diagnostics_desc">Sürüm, Android ve tuner desteğini görüntüle veya kopyala</string>
+    <string name="diagnostics_copy">Raporu kopyala</string>
+    <string name="recording_untitled">Başlıksız kayıt</string>
+    <string name="action_refresh">Yenile</string>
+    <string name="action_delete">Sil</string>
+    <string name="timer_record_notification">Yayın arka planda kaydediliyor</string>
+    <string name="section_recording">PVR / Kayıt</string>
+    <string name="timer_record_title">Anlık kayıt</string>
+    <string name="timer_record_start">Kaydı başlat</string>
+    <string name="timer_record_schedule">Programı kaydet</string>
+    <string name="timer_repeat_weekly">Her hafta tekrarla</string>
+    <string name="err_tune_timeout">Yayın zamanında açılamadı. Sinyali ve tuner durumunu kontrol edin.</string>
+    <string name="timer_weekly_badge">Haftalık</string>
+    <string name="epg_search_hint">Kanal veya program ara</string>
+    <string name="timer_record_ready">Seçili TV girişi kayıt destekliyor</string>
+    <string name="recordings_open_desc">Tamamlanan kayıtları oynat veya sil</string>
+    <string name="back_to_close">Kapatmak için GERİ tuşuna basın</string>
+    <string name="settings_theme_desc">TV arayüzü için koyu tema önerilir</string>
+    <string name="settings_text_size">Yazı boyutu</string>
+    <string name="settings_text_size_desc">Ekran metinlerini okunabilirliğe göre ayarla</string>
+    <string name="settings_text_small">Küçük</string>
+    <string name="settings_text_normal">Normal</string>
+    <string name="settings_text_large">Büyük</string>
+    <string name="settings_tuner_input_desc_ready">Otomatik seçildi · %1$s</string>
+    <string name="settings_tuner_input_desc_scan">Giriş var, kanal yok — tarama gerekli</string>
+    <string name="settings_tuner_input_desc_none">Bu cihazda TV girişi bulunamadı</string>
+
+    <!-- Bölüm başlıkları -->
+    <string name="section_appearance">Görünüm</string>
+    <string name="section_playback">Oynatma</string>
+    <string name="section_tuner">Tuner</string>
+    <string name="section_maintenance">Bakım</string>
+
+    <!-- İlk kurulum -->
+    <string name="first_launch_title">Makay Live TV</string>
+    <string name="first_launch_body">Dahili tunerinizdeki kanalları izlemek için hazır.</string>
+    <string name="first_launch_setup_steps">İlk kurulum adımları\n1. Kurulum / Kanal tara bölümünü açın.\n2. Uyduyu seçin; LNB ve DiSEqC ayarlarını tesisatınıza göre girin. Ayarları bilmiyorsanız cihazın mevcut tuner ayarlarını kullanın.\n3. Otomatik veya kör taramayı başlatıp kanal taramasının bitmesini bekleyin.\n4. Kaydedip Live TV’ye dönün; bulunan kanallar uygulamada otomatik görünür.\nMenü adları cihaz üreticisine göre değişebilir.</string>
+    <string name="first_launch_continue">Başla</string>
+    <string name="first_launch_open_setup">Uydu / kanal kurulumunu aç</string>
+    <string name="first_launch_status_tuner">Tuner</string>
+    <string name="first_launch_status_channel">Kanal</string>
+    <string name="first_launch_status_input">Giriş</string>
+    <string name="first_launch_ready">Hazır</string>
+    <string name="first_launch_need_scan">Tarama gerekli</string>
+    <string name="first_launch_none">Yok</string>
+    <string name="first_launch_scan_body">Kanal bulunamadı. Önce yukarıdaki uydu ve tuner kurulum adımlarını tamamlayıp cihazın DTV kanal taramasını çalıştırın; sonra buraya dönün.</string>
+
+    <!-- Uzaktan kumanda ipuçları -->
+    <string name="hint_up_down">Kanal değiştir</string>
+    <string name="hint_menu">Menü</string>
+
+    <!-- Etiketler -->
+    <string name="tag_hd">HD</string>
+    <string name="tag_radio">RADYO</string>
+    <string name="live_badge">● CANLI</string>
+
+    <!-- Bicimli metinler -->
+    <string name="sort_label">Sıra: %1$s</string>
+    <string name="search_channel_hint">Kanal ara…</string>
+    <string name="empty_filter_hint">Arama veya filtreleri temizleyin.</string>
+    <string name="epg_time_title">%1$s  %2$s</string>
+    <string name="epg_next_program">Sonraki: %1$s</string>
+    <string name="epg_range">%1$s – %2$s</string>
+    <string name="settings_banner_timeout_value">%1$s</string>
+
+    <!-- Zamanlayici / bildirim -->
+    <string name="notif_channel_timers">Zamanlayıcılar</string>
+    <string name="notif_remind_title">%1$s zamanı geldi</string>
+    <string name="notif_record_title">Kayıt başlıyor: %1$s</string>
+    <string name="timer_remind_title">Zamanlayıcı</string>
+    <string name="timer_remind_body">%1$s · %2$s</string>
+    <string name="timer_remind_watch">Şimdi izle</string>
+    <string name="timer_remind_record">Kaydı başlat</string>
+    <string name="timer_remind_close">Kapat</string>
+    <string name="timer_added">Zamanlayıcı eklendi</string>
+    <string name="timer_limit_reached">En fazla 32 etkin zamanlayıcı kurulabilir</string>
+    <string name="timer_conflict">Bu saatte aynı tuner üzerinde çakışan bir kayıt var</string>
+    <string name="timer_program_ended">Programın süresi doldu</string>
+    <string name="timer_removed">Zamanlayıcı kaldırıldı</string>
+    <string name="timer_exists">Bu program için zamanlayıcı zaten var</string>
+    <string name="timer_record_unsupported">Bu TV girişi kayıt yapmayı desteklemiyor</string>
+    <string name="timer_record_started">Kayıt başlatıldı</string>
+    <string name="timer_record_failed">Kayıt başlatılamadı</string>
+    <string name="timer_record_stop">Kaydı durdur</string>
+    <string name="timer_recording_active">● KAYIT</string>
+    <string name="timers_empty">Zamanlayıcı yok. TV Rehberi\'nden program seçip "Hatırlat" ekleyin.</string>
+    <string name="timers_title">Zamanlayıcılar</string>
+    <string name="timer_remind_action">Hatırlat</string>
+    <string name="timer_remind_cancel">Hatırlatmayı kaldır</string>
+    <string name="timer_scheduled_for">%1$s için kuruldu</string>
+
+    <!-- Zaman kaydirma (time-shift) -->
+    <string name="timeshift_paused">Duraklatıldı</string>
+    <string name="timeshift_position">%1$s / %2$s</string>
+    <string name="timeshift_live">CANLI</string>
+    <string name="timeshift_hint">⏸ Duraklat · ▶ Oynat · ◀◀ Geri · ▶▶ İleri · ■ Canlıya dön</string>
+    <string name="timeshift_unsupported">Bu kanalda zaman kaydırma desteklenmiyor</string>
+    <string name="options_timeshift">Zaman kaydırma</string>
+    <string name="timeshift_pause">Yayını duraklat</string>
+    <string name="timeshift_resume">Devam et</string>
+    <string name="timeshift_back">30 saniye geri</string>
+    <string name="timeshift_forward">30 saniye ileri</string>
+    <string name="section_parental">Ebeveyn denetimi</string>
+    <string name="parental_pin_title">Ebeveyn PIN’i</string>
+    <string name="parental_pin_enabled">PIN etkin · kanalları uzun basarak kilitleyin</string>
+    <string name="parental_pin_disabled">Kanal kilitlemek için PIN belirleyin</string>
+    <string name="parental_pin_set">PIN belirle</string>
+    <string name="parental_pin_change">PIN’i değiştir</string>
+    <string name="parental_pin_current">Mevcut PIN</string>
+    <string name="parental_pin_new">Yeni 4–8 haneli PIN</string>
+    <string name="parental_pin_remove">PIN’i kaldır</string>
+    <string name="parental_pin_hint">PIN</string>
+    <string name="parental_pin_wrong">PIN yanlış veya yeni PIN 4–8 rakam olmalı</string>
+    <string name="parental_unlock_watch">Kilidi aç ve izle</string>
+    <string name="channel_lock">PIN ile kilitle</string>
+    <string name="parental_age_limit">Yaş sınırı</string>
+    <string name="parental_age_limit_desc">Daha yüksek dereceli yayınlar PIN ister</string>
+    <string name="parental_age_requires_pin">Yaş sınırı için önce ebeveyn PIN’i belirleyin</string>
+    <string name="parental_age_off">Kapalı</string>
+    <string name="parental_rating_blocked">Yaş sınırı nedeniyle PIN gerekiyor</string>
+    <string name="channel_unlock">Kanal kilidini kaldır</string>
+    <string name="parental_pin_required">Önce Ayarlar’dan ebeveyn PIN’i belirleyin.</string>
+    <string name="settings_tuner_setup">Tarama ve tuner ayarları</string>
+    <string name="settings_tuner_setup_desc">Tarama, uydu/LNB, DiSEqC ve TKGS seçenekleri için cihazın DTV ayarlarını aç</string>
+    <string name="notif_permission_title">Bildirim izni gerekli</string>
+    <string name="notif_permission_body">Zamanlayıcı hatırlatmaları için Android ayarlarında Makay Live TV bildirimlerine izin verin. Zamanlayıcı kurulmadı.</string>
+    <string name="channel_backup_title">Kanal tercihleri yedeği</string>
+    <string name="channel_backup_desc">Favoriler, gizlenenler, atlananlar, kanal sırası ve adlarını JSON dosyasına aktarın veya geri yükleyin. Tuner kanal tablosu etkilenmez.</string>
+    <string name="channel_backup_export">Dışa aktar</string>
+    <string name="channel_backup_import">İçe aktar</string>
+    <string name="channel_backup_exported">Kanal tercihleri yedeklendi.</string>
+    <string name="channel_backup_imported">Kanal tercihleri yedekten yüklendi.</string>
+    <string name="channel_backup_failed">Yedek dosyası oluşturulamadı.</string>
+    <string name="channel_backup_invalid">Yedek dosyası okunamadı veya biçimi geçersiz.</string>
+    <string name="action_ok">Tamam</string>
+    <string name="quick_access">Hızlı erişim</string>
+    <string name="update_settings_title">Uygulama güncellemesi</string>
+    <string name="update_settings_desc">Yeni sürümü denetle ve güvenli biçimde indir</string>
+    <string name="update_check_button">Güncellemeyi denetle</string>
+    <string name="update_checking">Güncelleme denetleniyor…</string>
+    <string name="update_available_title">Yeni sürüm: %1$s</string>
+    <string name="update_available_body">Yeni Makay Live TV sürümü bulundu. İndirmek ve Android kurulum ekranını açmak ister misiniz?</string>
+    <string name="update_downloading">İndiriliyor…</string>
+    <string name="update_install">İndir ve kur</string>
+    <string name="update_later">Daha sonra</string>
+
+    <!-- Cogullar: Turkce tek/çok ayni, Ingilizce farkli -->
+    <plurals name="channel_count">
+        <item quantity="other">%1$d kanal</item>
+    </plurals>
+    <plurals name="channel_count_value">
+        <item quantity="other">%1$d kanal</item>
+    </plurals>
+    <plurals name="input_count">
+        <item quantity="other">%1$d giriş bulundu</item>
+    </plurals>
+    <plurals name="banner_timeout_seconds">
+        <item quantity="other">%1$d saniye</item>
+    </plurals>
+</resources>

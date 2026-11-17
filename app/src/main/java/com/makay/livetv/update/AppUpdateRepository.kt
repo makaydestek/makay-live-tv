@@ -1,0 +1,428 @@
+package com.makay.livetv.update
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
+import androidx.core.content.getSystemService
+import com.makay.livetv.BuildConfig
+import com.makay.livetv.MainActivity
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.io.FilterInputStream
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
+
+/**
+ * Makay Video Player ile aynı mantık:
+ * GitHub Releases → açılış kontrolü → bildirim + diyalog (Güncelle / Ertele) → SHA-256 + imza → kur.
+ * Kaynak: https://github.com/makaydestek/makay-live-tv/releases
+ */
+class AppUpdateRepository(context: Context) {
+
+    private val appContext = context.applicationContext
+    private val integrity = ApkIntegrityVerifier(appContext)
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val updateDir = File(appContext.cacheDir, "updates").also { it.mkdirs() }
+
+    private val owner get() = BuildConfig.UPDATE_GITHUB_OWNER
+    private val repo get() = BuildConfig.UPDATE_GITHUB_REPO
+    private val apiLatest get() = "https://api.github.com/repos/$owner/$repo/releases/latest"
+
+    fun shouldCheckAutomatically(minIntervalMs: Long = DEFAULT_CHECK_INTERVAL_MS): Boolean {
+        val last = prefs.getLong(KEY_LAST_CHECK_MS, 0L)
+        return System.currentTimeMillis() - last >= minIntervalMs
+    }
+
+    fun markCheckedNow() {
+        prefs.edit().putLong(KEY_LAST_CHECK_MS, System.currentTimeMillis()).apply()
+    }
+
+    fun checkForUpdate(force: Boolean = false): AvailableUpdate? {
+        if (!force && !shouldCheckAutomatically()) return null
+        val release = fetchLatestReleaseJson()
+        markCheckedNow()
+        if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null
+        val tag = release.optString("tag_name", "")
+        val versionName = normalizeVersion(tag)
+        if (versionName.isBlank()) return null
+        if (compareVersions(versionName, BuildConfig.VERSION_NAME) <= 0) return null
+
+        val assets = release.optJSONArray("assets") ?: return null
+        var apkName = ""
+        var apkUrl = ""
+        var apkSize = 0L
+        var apkDigest: String? = null
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            val name = a.optString("name", "")
+            val url = a.optString("browser_download_url", "")
+            if (!name.endsWith(".apk", true) || url.isBlank()) continue
+            // mapping.txt / .apk.sha256 değil; yalnızca gerçek APK
+            if (name.contains("mapping", ignoreCase = true)) continue
+            val preferred = name.startsWith("MakayLiveTV", true)
+            if (apkUrl.isBlank() || preferred) {
+                apkName = name
+                apkUrl = url
+                apkSize = a.optLong("size", 0L)
+                apkDigest = a.optString("digest", "").takeIf { it.isNotBlank() && it != "null" }
+                if (preferred) break
+            }
+        }
+        if (apkUrl.isBlank()) return null
+
+        when (val urlCheck = integrity.assertTrustedDownloadUrl(apkUrl)) {
+            is ApkIntegrityVerifier.Result.Failed -> error(urlCheck.message)
+            ApkIntegrityVerifier.Result.Ok -> Unit
+        }
+
+        val expectedSha = normalizeUpdateSha(
+            resolveExpectedSha256(release, apkName, apkDigest)
+        )
+        // Yeni sürüm var ama özet yoksa "güncel" gibi sessizce geçme.
+        if (expectedSha == null) {
+            error(
+                "Yeni sürüm $versionName bulundu fakat SHA-256 özeti okunamadı. " +
+                    "Release’te .apk.sha256 asset’ini kontrol edin."
+            )
+        }
+
+        return AvailableUpdate(
+            tag = tag,
+            versionName = versionName,
+            apkUrl = apkUrl,
+            apkName = apkName,
+            releaseNotes = cleanReleaseNotes(release),
+            htmlUrl = release.optString("html_url", "https://github.com/$owner/$repo/releases/latest")
+                .takeIf { it.isNotBlank() && it != "null" }
+                ?: "https://github.com/$owner/$repo/releases/latest",
+            expectedSha256 = expectedSha,
+            expectedSizeBytes = apkSize.takeIf { it > 0 }
+        )
+    }
+
+    /**
+     * SHA önceliği: GitHub asset digest → .sha256 asset → release body.
+     */
+    private fun resolveExpectedSha256(
+        release: JSONObject,
+        apkName: String,
+        apkDigest: String?
+    ): String? {
+        normalizeUpdateSha(apkDigest?.removePrefix("sha256:")?.removePrefix("SHA256:"))
+            ?.let { return it }
+
+        val assets = release.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            val name = a.optString("name", "").lowercase()
+            val url = a.optString("browser_download_url", "")
+            if (url.isBlank() || url == "null") continue
+            if (!(name.endsWith(".sha256") || name == "sha256sums" || name == "checksums.txt")) {
+                continue
+            }
+            if (!ApkIntegrityVerifier.isTrustedGitHubReleaseUrl(url)) continue
+            val text = runCatching { fetchText(url) }.getOrNull() ?: continue
+            ApkIntegrityVerifier.parseSha256Fingerprint(text, apkName)?.let { return it }
+        }
+        return ApkIntegrityVerifier.parseSha256Fingerprint(
+            cleanReleaseNotes(release),
+            apkName
+        )
+    }
+
+    /** Android JSONObject.optString, JSON null için literal "null" döndürür. */
+    private fun cleanReleaseNotes(release: JSONObject): String {
+        if (!release.has("body") || release.isNull("body")) return ""
+        val raw = release.optString("body", "").trim()
+        if (raw.isEmpty() || raw.equals("null", ignoreCase = true)) return ""
+        return raw.take(1200)
+    }
+
+    fun downloadApk(update: AvailableUpdate, onProgress: (Int) -> Unit = {}): File {
+        when (val urlCheck = integrity.assertTrustedDownloadUrl(update.apkUrl)) {
+            is ApkIntegrityVerifier.Result.Failed -> error(urlCheck.message)
+            ApkIntegrityVerifier.Result.Ok -> Unit
+        }
+
+        // Cache temizliği veya süreç ölümü sonrası klasör kaybolabilir
+        if (!updateDir.exists() && !updateDir.mkdirs()) {
+            error("Güncelleme klasörü oluşturulamadı: ${updateDir.absolutePath}")
+        }
+
+        val safeName = update.apkName
+            .substringAfterLast('/')
+            .ifBlank { "MakayLiveTV-update.apk" }
+            .replace(Regex("""[^\w.\-]+"""), "_")
+        val target = File(updateDir, safeName)
+        val partial = File(updateDir, "$safeName.partial")
+
+        // Daha önce indirilip doğrulanmış aynı dosyayı yeniden kullan.
+        if (target.isFile &&
+            runCatching { ApkIntegrityVerifier.sha256Hex(target) }.getOrNull()
+                ?.equals(update.expectedSha256, ignoreCase = true) == true
+        ) {
+            onProgress(100)
+            return target
+        }
+
+        // Yalnızca kendi geçici/hedef dosyalarımızı temizle; başka bir
+        // indirmenin verisini silme.
+        runCatching { partial.delete() }
+        runCatching { target.delete() }
+        updateDir.listFiles()
+            ?.filter { it.isFile && (it.name.endsWith(".partial") || it.name.endsWith(".apk")) && it != target }
+            ?.forEach { runCatching { it.delete() } }
+
+        try {
+            val conn = openTrustedConnection(update.apkUrl)
+            try {
+                val code = conn.responseCode
+                check(code in 200..299) {
+                    "İndirme HTTP $code — GitHub’dan APK alınamadı"
+                }
+                val total = conn.contentLengthLong.takeIf { it > 0 }
+                    ?: update.expectedSizeBytes
+                    ?: -1L
+                // Boyut üst sınırı: kötü niyetli/hatalı sunucu diski doldurmasın.
+                val hardLimit = (update.expectedSizeBytes ?: total).takeIf { it > 0 }
+                    ?.let { (it * 1.05).toLong() + 1024 * 1024 }
+                    ?: (250L * 1024 * 1024)
+                var lastPct = -1
+                val raw: InputStream = conn.inputStream
+                    ?: error("İndirme akışı boş (HTTP $code)")
+                val counted = object : FilterInputStream(raw) {
+                    private var written = 0L
+                    override fun read(b: ByteArray, off: Int, len: Int): Int {
+                        val n = super.read(b, off, len)
+                        if (n > 0) {
+                            written += n
+                            check(written <= hardLimit) {
+                                "İndirilen dosya beklenen boyutu aştı; indirme iptal edildi."
+                            }
+                            if (total > 0) {
+                                val pct = ((written * 100) / total).toInt().coerceIn(0, 100)
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    onProgress(pct)
+                                }
+                            }
+                        }
+                        return n
+                    }
+                }
+                FileOutputStream(partial).use { out ->
+                    counted.copyTo(out)
+                    runCatching { out.fd.sync() }
+                }
+            } finally {
+                conn.disconnect()
+            }
+
+            if (!partial.isFile || partial.length() < 1_000L) {
+                runCatching { partial.delete() }
+                error("APK indirilemedi veya dosya boş kaldı.")
+            }
+            runCatching { target.delete() }
+            if (!partial.renameTo(target)) {
+                // rename başarısızsa kopyala
+                partial.copyTo(target, overwrite = true)
+                runCatching { partial.delete() }
+            }
+            if (!target.isFile) {
+                error("APK kaydedilemedi: ${target.absolutePath}")
+            }
+            onProgress(100)
+
+            when (
+                val verified = integrity.verifyDownloadedApk(
+                    apkFile = target,
+                    expectedSha256 = update.expectedSha256,
+                    expectedSizeBytes = update.expectedSizeBytes
+                )
+            ) {
+                is ApkIntegrityVerifier.Result.Failed -> {
+                    runCatching { target.delete() }
+                    error(verified.message)
+                }
+                ApkIntegrityVerifier.Result.Ok -> return target
+            }
+        } catch (e: Exception) {
+            runCatching { partial.delete() }
+            runCatching { target.delete() }
+            throw e
+        }
+    }
+
+    fun canRequestInstall(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            appContext.packageManager.canRequestPackageInstalls()
+        } else true
+    }
+
+    fun unknownSourcesSettingsIntent(): Intent {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${appContext.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else {
+            Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    fun installIntent(file: File): Intent {
+        if (!file.isFile || file.length() < 1_000L) {
+            error("Kurulum dosyası bulunamadı. Lütfen Güncelle’ye tekrar basın.")
+        }
+        if (!updateDir.exists()) updateDir.mkdirs()
+        val uri = FileProvider.getUriForFile(
+            appContext,
+            "${appContext.packageName}.fileprovider",
+            file
+        )
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    fun showUpdateNotification(update: AvailableUpdate) {
+        val nm = appContext.getSystemService<NotificationManager>() ?: return
+        ensureChannel(nm)
+        val open = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_SHOW_UPDATE, true)
+            putExtra(EXTRA_AUTO_DOWNLOAD, true)
+            putExtra(EXTRA_UPDATE_TAG, update.tag)
+        }
+        val pending = PendingIntent.getActivity(
+            appContext,
+            NOTIFICATION_ID,
+            open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("Yeni sürüm hazır")
+            .setContentText("Makay Live TV ${update.versionName} — Dokunun, güncelleyin veya erteleyin")
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        nm.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun ensureChannel(nm: NotificationManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                "Uygulama güncellemeleri",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Yeni Makay Live TV sürüm bildirimleri"
+            }
+        )
+    }
+
+    /**
+     * Yönlendirmeleri elle takip eder ve her `Location` hedefini allowlist ile
+     * doğrular. `instanceFollowRedirects = true` ile herhangi bir host'a
+     * (hatta HTTP'ye) gidilebilirdi.
+     */
+    private fun openTrustedConnection(url: String): HttpURLConnection {
+        var current = url
+        var hop = 0
+        while (hop < 4) {
+            val conn = (URL(current).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 30_000
+                readTimeout = 10 * 60_000
+                instanceFollowRedirects = false
+                setRequestProperty("User-Agent", "MakayLiveTV/${BuildConfig.VERSION_NAME}")
+                setRequestProperty("Accept", "application/octet-stream,*/*")
+            }
+            val code = conn.responseCode
+            if (code !in 300..399) return conn
+            val location = conn.getHeaderField("Location")
+            conn.disconnect()
+            check(!location.isNullOrBlank()) { "Yönlendirme hedefi okunamadı (HTTP $code)" }
+            val next = URL(URL(current), location).toString()
+            when (val v = integrity.assertTrustedDownloadUrl(next)) {
+                is ApkIntegrityVerifier.Result.Failed ->
+                    error("Güncelleme yönlendirmesi güvenilir değil: ${v.message}")
+                ApkIntegrityVerifier.Result.Ok -> current = next
+            }
+            hop++
+        }
+        error("Çok fazla yönlendirme; indirme iptal edildi.")
+    }
+
+    private fun fetchLatestReleaseJson(): JSONObject {
+        val conn = (URL(apiLatest).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 12_000
+            readTimeout = 20_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "MakayLiveTV/${BuildConfig.VERSION_NAME}")
+        }
+        try {
+            if (conn.responseCode == 404) error("Henüz GitHub Release yok")
+            check(conn.responseCode in 200..299) { "GitHub API ${conn.responseCode}" }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            return JSONObject(body)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun fetchText(url: String): String {
+        val conn = openTrustedConnection(url)
+        try {
+            check(conn.responseCode in 200..299) { "Hash HTTP ${conn.responseCode}" }
+            return conn.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    companion object {
+        const val DEFAULT_CHECK_INTERVAL_MS = 12L * 60L * 60L * 1000L
+        const val CHANNEL_ID = "app_updates"
+        const val NOTIFICATION_ID = 46046
+        const val EXTRA_SHOW_UPDATE = "show_app_update"
+        const val EXTRA_AUTO_DOWNLOAD = "auto_download_update"
+        const val EXTRA_UPDATE_TAG = "app_update_tag"
+        private const val PREFS = "app_update"
+        private const val KEY_LAST_CHECK_MS = "last_check_ms"
+
+        fun normalizeVersion(raw: String): String =
+            raw.trim().removePrefix("v").removePrefix("V").trim()
+
+        /** Geçerli 64 hex SHA-256; aksi halde null (güncelleme sunulmaz). */
+        fun normalizeUpdateSha(raw: String?): String? =
+            raw?.trim()?.lowercase()?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+
+        fun compareVersions(a: String, b: String): Int {
+            val pa = normalizeVersion(a).split('.', '-', '_').mapNotNull { it.toIntOrNull() }
+            val pb = normalizeVersion(b).split('.', '-', '_').mapNotNull { it.toIntOrNull() }
+            val n = maxOf(pa.size, pb.size)
+            for (i in 0 until n) {
+                val x = pa.getOrElse(i) { 0 }
+                val y = pb.getOrElse(i) { 0 }
+                if (x != y) return x.compareTo(y)
+            }
+            return 0
+        }
+
+    }
+}
