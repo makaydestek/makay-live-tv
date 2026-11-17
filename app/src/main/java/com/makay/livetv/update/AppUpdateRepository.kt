@@ -376,7 +376,9 @@ class AppUpdateRepository(context: Context) {
             setRequestProperty("User-Agent", "MakayLiveTV/${BuildConfig.VERSION_NAME}")
         }
         try {
-            if (conn.responseCode == 404) error("Henüz GitHub Release yok")
+            if (conn.responseCode == 404) {
+                error("GitHub Release bulunamadı (404). Depo adını ve yayın durumunu kontrol edin.")
+            }
             check(conn.responseCode in 200..299) { "GitHub API ${conn.responseCode}" }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             return JSONObject(body)

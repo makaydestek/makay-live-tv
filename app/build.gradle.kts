@@ -51,7 +51,7 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"makaydestek\"")
-        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"makay-livetv\"")
+        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"makay-live-tv\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

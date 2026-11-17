@@ -2,7 +2,6 @@ package com.makay.livetv.update
 
 import android.app.Activity
 import android.app.Application
-import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -14,7 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Job
 import java.io.File
 
 data class AppUpdateUiState(
@@ -37,30 +35,20 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
     val state: StateFlow<AppUpdateUiState> = _state.asStateFlow()
 
     private var postponedThisSession = false
-    private var wasBackgrounded = false
-    private var lastForegroundCheckAt = 0L
-    private var launchCheckJob: Job? = null
+    private var launchChecked = false
 
     fun checkOnLaunch() {
-        checkForUpdateOnForeground()
-    }
-
-    /** Recheck after returning to the app, but debounce duplicate lifecycle events. */
-    fun checkForUpdateOnForeground() {
-        val now = SystemClock.elapsedRealtime()
-        if (launchCheckJob?.isActive == true) return
-        if (lastForegroundCheckAt > 0L && now - lastForegroundCheckAt < FOREGROUND_CHECK_DEBOUNCE_MS) return
-        if (wasBackgrounded) postponedThisSession = false
-        wasBackgrounded = false
-        lastForegroundCheckAt = now
-        launchCheckJob = viewModelScope.launch {
+        if (launchChecked) return
+        launchChecked = true
+        viewModelScope.launch {
             _state.update { it.copy(checking = true, error = null) }
             val result = runCatching {
-                // Her uygulama açılışında/öne gelişinde resmi son sürümü denetle.
-                withContext(Dispatchers.IO) { repository.checkForUpdate(force = true) }
+                // Makay Cleaner gibi açılışta 12 saatlik kontrol aralığına uy.
+                withContext(Dispatchers.IO) { repository.checkForUpdate(force = false) }
             }
             val update = result.getOrNull()
             if (update != null && !postponedThisSession) {
+                runCatching { repository.showUpdateNotification(update) }
                 _state.update {
                     it.copy(
                         checking = false,
@@ -84,9 +72,9 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** Postpone is session-scoped; leaving the app allows the next entry to prompt again. */
-    fun onAppBackgrounded() {
-        wasBackgrounded = true
+    /** Compose may call this from ON_START as well; the launch check runs once per session. */
+    fun checkForUpdateOnForeground() {
+        checkOnLaunch()
     }
 
     fun handleNotificationOpen(autoDownload: Boolean, activity: Activity?) {
@@ -136,6 +124,7 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
             val err = result.exceptionOrNull()?.localizedMessage ?: result.exceptionOrNull()?.message
             when {
                 update != null -> {
+                    runCatching { repository.showUpdateNotification(update) }
                     _state.update {
                         it.copy(
                             checking = false,
@@ -300,7 +289,4 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private companion object {
-        const val FOREGROUND_CHECK_DEBOUNCE_MS = 10_000L
-    }
 }

@@ -71,7 +71,6 @@ fun AppRoot(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> updateVm.checkForUpdateOnForeground()
-                Lifecycle.Event.ON_STOP -> updateVm.onAppBackgrounded()
                 Lifecycle.Event.ON_RESUME -> if (updateState.needsInstallPermission) {
                     (context as? Activity)?.let(updateVm::retryInstallAfterPermission)
                 }
