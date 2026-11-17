@@ -46,13 +46,12 @@
     <uses-feature android:name="android.software.live_tv" android:required="false" />
 
     <application
-        android:name=".MakayLiveTvApplication"
         android:allowBackup="false"
         android:banner="@drawable/tv_banner"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="Makay Live TV"
         android:largeHeap="true"
         android:localeConfig="@xml/locales_config"
         android:logo="@mipmap/ic_launcher"
@@ -65,6 +64,7 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
             android:exported="true"
+            android:label="Makay Live TV"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:screenOrientation="landscape"
