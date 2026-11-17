@@ -43,6 +43,7 @@ import com.makay.livetv.player.TimeShiftState
 import com.makay.livetv.player.TunerPlayerController
 import com.makay.livetv.timer.TimerEvent
 import com.makay.livetv.timer.TimerEventBus
+import kotlinx.coroutines.flow.collect
 import com.makay.livetv.update.AppUpdateViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
