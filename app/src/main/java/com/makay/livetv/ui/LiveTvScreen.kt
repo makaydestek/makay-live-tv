@@ -54,7 +54,6 @@ import com.makay.livetv.epg.ChannelEpg
 import com.makay.livetv.player.AspectMode
 import com.makay.livetv.player.PlaybackState
 import com.makay.livetv.player.TunerPlayerController
-import com.makay.livetv.player.TunerSignalMetrics
 import com.makay.livetv.player.TunerTvView
 import com.makay.livetv.ui.theme.MakayPrimary
 import com.makay.livetv.ui.theme.OverlayScrim
@@ -77,7 +76,6 @@ import com.makay.livetv.util.TimeFormat
 fun LiveTvScreen(
     activeChannel: Channel?,
     signalStrength: Int?,
-    signalMetrics: TunerSignalMetrics?,
     channelsLoading: Boolean,
     epg: ChannelEpg?,
     playbackState: PlaybackState,
@@ -157,7 +155,7 @@ fun LiveTvScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             activeChannel?.let {
-                InfoBanner(channel = it, epg = epg, signalStrength = signalStrength, signalMetrics = signalMetrics)
+                InfoBanner(channel = it, epg = epg, signalStrength = signalStrength)
             }
         }
 
@@ -353,7 +351,6 @@ private fun InfoBanner(
     channel: Channel,
     epg: ChannelEpg?,
     signalStrength: Int?,
-    signalMetrics: TunerSignalMetrics?,
 ) {
     val now = System.currentTimeMillis()
     Box(
@@ -450,28 +447,16 @@ private fun InfoBanner(
                     TvInputManager.SIGNAL_STRENGTH_LOST -> stringResource(R.string.signal_level_lost)
                     else -> stringResource(R.string.signal_level_unknown)
                 }
-                val numericStrength = signalMetrics?.strength?.let { "$it%" } ?: signalLabel
-                val numericQuality = signalMetrics?.quality?.let { "$it%" }
-                    ?: stringResource(R.string.signal_quality_unavailable)
                 SignalMetric(
                     label = stringResource(R.string.signal_label),
-                    value = numericStrength,
+                    value = signalLabel,
                     strength = signalStrength,
                 )
                 SignalMetric(
                     label = stringResource(R.string.signal_quality_label),
-                    value = numericQuality,
+                    value = stringResource(R.string.signal_quality_unavailable),
                     strength = null,
                 )
-            }
-            signalMetrics?.let { metrics ->
-                val berText = metrics.ber?.let { stringResource(R.string.signal_ber_value, it) }
-                val dbmText = metrics.dbm?.let { stringResource(R.string.signal_dbm_value, it) }
-                val dbText = metrics.db?.let { stringResource(R.string.signal_db_value, it) }
-                val details = listOfNotNull(berText, dbmText, dbText).joinToString("   ·   ")
-                if (details.isNotBlank()) {
-                    Text(details, color = Color(0xFF8FA6C8), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
             }
         }
     }

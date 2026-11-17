@@ -91,9 +91,6 @@
     <string name="signal_label">Sinyal</string>
     <string name="signal_quality_label">Kalite</string>
     <string name="signal_quality_unavailable">Tuner ölçüm sunmuyor</string>
-    <string name="signal_ber_value">BER %1$d</string>
-    <string name="signal_dbm_value">dBm %1$d</string>
-    <string name="signal_db_value">dB %1$d</string>
     <string name="channel_quick_access_hint">Sağ: filtre/sıralama · Aşağı: kanallara dön</string>
     <string name="settings_theme">Tema</string>
     <string name="settings_theme_dark">Koyu</string>
