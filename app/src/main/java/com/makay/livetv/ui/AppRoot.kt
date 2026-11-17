@@ -43,7 +43,6 @@ import com.makay.livetv.player.TimeShiftState
 import com.makay.livetv.player.TunerPlayerController
 import com.makay.livetv.timer.TimerEvent
 import com.makay.livetv.timer.TimerEventBus
-import kotlinx.coroutines.flow.collect
 import com.makay.livetv.update.AppUpdateViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -285,15 +284,21 @@ fun AppRoot(
     // Oynatma secenekleri paneli izleri controller hazir olunca toplar.
     LaunchedEffect(controller) {
         val ready = controller ?: return@LaunchedEffect
-        ready.trackState.collect { trackState = it }
+        ready.trackState.collect(object : kotlinx.coroutines.flow.FlowCollector<TrackState> {
+            override suspend fun emit(value: TrackState) { trackState = value }
+        })
     }
     LaunchedEffect(controller) {
         val ready = controller ?: run { signalStrength = null; return@LaunchedEffect }
-        ready.signalStrength.collect { signalStrength = it }
+        ready.signalStrength.collect(object : kotlinx.coroutines.flow.FlowCollector<Int?> {
+            override suspend fun emit(value: Int?) { signalStrength = value }
+        })
     }
     LaunchedEffect(controller) {
         val ready = controller ?: return@LaunchedEffect
-        ready.timeShiftState.collect { timeShiftState = it }
+        ready.timeShiftState.collect(object : kotlinx.coroutines.flow.FlowCollector<TimeShiftState> {
+            override suspend fun emit(value: TimeShiftState) { timeShiftState = value }
+        })
     }
 
     // Bindirme acilip kapaninca (ve ilk acilista) canli TV odagi geri alinir;
