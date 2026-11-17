@@ -6,6 +6,9 @@ import android.media.tv.TvContract
 import android.media.tv.TvInputManager
 import android.media.tv.TvTrackInfo
 import android.media.tv.TvView
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.SurfaceView
@@ -42,6 +45,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.coroutines.resume
 
 /** TvView'un oynatma durumu — UI katmani bunun uzerinden bindirme cizer. */
@@ -75,6 +80,16 @@ data class TimeShiftState(
     val currentPositionMs: Long = 0L,
 )
 
+/** Numeric signal values optionally exposed by a vendor TV input. */
+data class TunerSignalMetrics(
+    val strength: Int? = null,
+    val quality: Int? = null,
+    val ber: Int? = null,
+    val berCount: Int? = null,
+    val dbm: Int? = null,
+    val db: Int? = null,
+)
+
 /**
  * Dahili tuner oynatmasini yoneten kontrolcu.
  *
@@ -104,12 +119,23 @@ class TunerPlayerController(
     private val _trackState = MutableStateFlow(TrackState())
     private val _timeShiftState = MutableStateFlow(TimeShiftState())
     private val _signalStrength = MutableStateFlow<Int?>(null)
+    private val _signalMetrics = MutableStateFlow<TunerSignalMetrics?>(null)
+    private val signalHandler = Handler(Looper.getMainLooper())
+    private val signalPoll = object : Runnable {
+        override fun run() {
+            requestSignalMetrics()
+            if (isDtvKitInput(currentChannel?.inputId)) {
+                signalHandler.postDelayed(this, SIGNAL_POLL_INTERVAL_MS)
+            }
+        }
+    }
 
     /** Yayindaki ses/altyazi izleri (Compose bunu toplar). */
     val trackState: StateFlow<TrackState> = _trackState.asStateFlow()
     val timeShiftState: StateFlow<TimeShiftState> = _timeShiftState.asStateFlow()
     /** TIF signal category (lost/weak/strong), available on Android 13+. */
     val signalStrength: StateFlow<Int?> = _signalStrength.asStateFlow()
+    val signalMetrics: StateFlow<TunerSignalMetrics?> = _signalMetrics.asStateFlow()
 
     private val timeShiftCallback = object : TvView.TimeShiftPositionCallback() {
         override fun onTimeShiftCurrentPositionChanged(inputId: String?, timeMs: Long) {
@@ -128,6 +154,15 @@ class TunerPlayerController(
             if (inputId == currentChannel?.inputId) {
                 _signalStrength.value = strength
             }
+        }
+
+        override fun onEvent(inputId: String?, eventType: String?, args: Bundle?) {
+            if (inputId != currentChannel?.inputId || args == null) return
+            val containsSignalData = listOf(
+                KEY_SIGNAL_STRENGTH, KEY_SIGNAL_QUALITY, KEY_SIGNAL_BER, KEY_SIGNAL_DBM, KEY_SIGNAL_DB, KEY_INFO,
+            ).any(args::containsKey)
+            if (eventType != EVENT_SIGNAL_INFO && eventType != ACTION_GET_SIGNAL_BER_INFO && !containsSignalData) return
+            parseSignalMetrics(args)?.let { _signalMetrics.value = it }
         }
 
         override fun onTracksChanged(inputId: String?, tracks: MutableList<TvTrackInfo>?) {
@@ -204,7 +239,86 @@ class TunerPlayerController(
         confirmedChannelId = ch.id
         onState(PlaybackState.Playing(ch))
         refreshTracks()
+        startSignalPolling()
     }
+
+    private fun startSignalPolling() {
+        signalHandler.removeCallbacks(signalPoll)
+        if (isDtvKitInput(currentChannel?.inputId)) signalHandler.post(signalPoll)
+    }
+
+    /** DTVKit input private command used by the licensed SEI TV input. */
+    private fun requestSignalMetrics() {
+        val view = tvView ?: return
+        runCatching {
+            view.sendAppPrivateCommand(
+                ACTION_GET_SIGNAL_BER_INFO,
+                Bundle().apply { putBoolean(KEY_IS_NEED_BER, true) },
+            )
+        }.onFailure { SafeLog.d(TAG, "DTVKit sinyal ölçümü desteklenmiyor: ${it.message}") }
+    }
+
+    private fun parseSignalMetrics(bundle: Bundle): TunerSignalMetrics? {
+        val values = mutableMapOf<String, Int>()
+        fun Bundle.readInt(key: String): Int? = runCatching {
+            when (val value = get(key)) {
+                is Number -> value.toInt()
+                is String -> value.toIntOrNull()
+                else -> null
+            }
+        }.getOrNull()
+
+        val encoded = runCatching { bundle.getString(KEY_INFO) }.getOrNull()
+            ?: runCatching { bundle.getString("signal_info") }.getOrNull()
+        if (!encoded.isNullOrBlank()) runCatching {
+            if (encoded.trimStart().startsWith("[")) {
+                val items = JSONArray(encoded)
+                for (index in 0 until items.length()) {
+                    val item = items.optJSONObject(index) ?: continue
+                    val name = item.optString("name")
+                    if (name.isNotBlank() && item.has("value")) values[name] = item.optInt("value")
+                }
+            } else {
+                val root = JSONObject(encoded)
+                val signal = root.optJSONObject("signal") ?: root
+                listOf(
+                    KEY_SIGNAL_STRENGTH to listOf("strength", "rssi"),
+                    KEY_SIGNAL_QUALITY to listOf("quality", "snr"),
+                    KEY_SIGNAL_BER to listOf("ber"),
+                    KEY_SIGNAL_BER_NUM to listOf("ber_num"),
+                    KEY_SIGNAL_DBM to listOf("dbm"),
+                    KEY_SIGNAL_DB to listOf("db"),
+                ).forEach { (key, aliases) ->
+                    (listOf(key) + aliases).firstNotNullOfOrNull { candidate ->
+                        signal.opt(candidate)?.let { value -> value.toString().toIntOrNull() }
+                    }?.let { values[key] = it }
+                }
+            }
+        }
+        fun value(key: String, vararg aliases: String): Int? =
+            bundle.readInt(key) ?: (listOf(key) + aliases).firstNotNullOfOrNull(values::get)
+
+        val metrics = TunerSignalMetrics(
+            strength = value(KEY_SIGNAL_STRENGTH, "strength", "rssi"),
+            quality = value(KEY_SIGNAL_QUALITY, "quality", "snr"),
+            ber = value(KEY_SIGNAL_BER, "ber"),
+            berCount = value(KEY_SIGNAL_BER_NUM, "ber_num"),
+            dbm = value(KEY_SIGNAL_DBM, "dbm"),
+            db = value(KEY_SIGNAL_DB, "db"),
+        )
+        return metrics.takeIf {
+            it.strength != null || it.quality != null || it.ber != null || it.dbm != null || it.db != null
+        }
+    }
+
+    private fun isDtvKitInput(inputId: String?): Boolean = inputId
+        ?.substringBefore('/')
+        ?.let {
+            it.contains("dtvkit", ignoreCase = true) ||
+                it == DROIDLOGIC_INPUT_PACKAGE ||
+                it == SEI_DTV_INPUT_PACKAGE
+        }
+        ?: false
 
     /** Kisa yoldan yerellestirilmis metin. */
     private fun str(resId: Int): String = context.getString(resId)
@@ -220,6 +334,7 @@ class TunerPlayerController(
     }
 
     fun detach() {
+        signalHandler.removeCallbacks(signalPoll)
         tvView?.let { view ->
             runCatching {
                 view.setCallback(null)
@@ -235,6 +350,7 @@ class TunerPlayerController(
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
         _signalStrength.value = null
+        _signalMetrics.value = null
         _timeShiftState.value = TimeShiftState()
     }
 
@@ -246,8 +362,10 @@ class TunerPlayerController(
             return
         }
         if (confirmedChannelId == channel.id) return
+        signalHandler.removeCallbacks(signalPoll)
         currentChannel = channel
         _signalStrength.value = null
+        _signalMetrics.value = null
         confirmedChannelId = null
         hasConfirmedPlayback = false
         tuneInProgress = true
@@ -298,6 +416,7 @@ class TunerPlayerController(
     }
 
     fun stop() {
+        signalHandler.removeCallbacks(signalPoll)
         runCatching { tvView?.reset() }.onFailure { SafeLog.w(TAG, "reset", it) }
         currentChannel = null
         confirmedChannelId = null
@@ -306,6 +425,7 @@ class TunerPlayerController(
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
         _signalStrength.value = null
+        _signalMetrics.value = null
         onState(PlaybackState.Idle)
     }
 
@@ -337,6 +457,22 @@ class TunerPlayerController(
     fun dispatchKey(event: KeyEvent): Boolean {
         val view = tvView ?: return false
         return runCatching { view.dispatchKeyEvent(event) }.getOrDefault(false)
+    }
+
+    /** Requests the same DTVKit full-page teletext service used by SEI Live TV. */
+    fun toggleTeletext(): Boolean {
+        val view = tvView ?: return false
+        val requested = runCatching {
+            view.sendAppPrivateCommand(ACTION_FULLPAGE_TELETEXT, null)
+            true
+        }.onFailure { SafeLog.d(TAG, "Tam sayfa teletext komutu desteklenmiyor: ${it.message}") }
+            .getOrDefault(false)
+        val now = SystemClock.uptimeMillis()
+        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TV_TELETEXT, 0)
+        val up = KeyEvent(now, now + 1, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TV_TELETEXT, 0)
+        val handledDown = dispatchKey(down)
+        val handledUp = dispatchKey(up)
+        return requested || handledDown || handledUp
     }
 
     /** Ses izi secer (`id = null` → otomatik secim). */
@@ -412,6 +548,20 @@ class TunerPlayerController(
 
     companion object {
         private const val TAG = "TunerPlayer"
+        private const val SIGNAL_POLL_INTERVAL_MS = 1_000L
+        private const val ACTION_GET_SIGNAL_BER_INFO = "event_get_signal_ber_info"
+        private const val EVENT_SIGNAL_INFO = "event_signal_info"
+        private const val KEY_IS_NEED_BER = "is_need_ber"
+        private const val KEY_INFO = "info"
+        private const val KEY_SIGNAL_STRENGTH = "signal_strength"
+        private const val KEY_SIGNAL_QUALITY = "signal_quality"
+        private const val KEY_SIGNAL_BER = "signal_ber"
+        private const val KEY_SIGNAL_BER_NUM = "signal_ber_num"
+        private const val KEY_SIGNAL_DBM = "signal_dbm"
+        private const val KEY_SIGNAL_DB = "signal_db"
+        private const val ACTION_FULLPAGE_TELETEXT = "com.google.android.tv.dtvinput.play.mode.FULLPAGE_TELETEXT"
+        private const val DROIDLOGIC_INPUT_PACKAGE = "org.dtvkit.inputsource"
+        private const val SEI_DTV_INPUT_PACKAGE = "com.google.android.tv.dtvinput"
 
         /** Yaygin dil kodlari (ISO 639-1/2) → dilin kendi yazimi. */
         private val LANGUAGE_ENDONYMS = mapOf(

@@ -64,6 +64,7 @@ fun PlaybackOptionsScreen(
     onAspectChange: (AspectMode) -> Unit,
     onSelectAudio: (String?) -> Unit,
     onSelectSubtitle: (String?) -> Unit,
+    onToggleTeletext: () -> Unit,
     onToggleTimeShift: () -> Unit,
     onSeekTimeShift: (Long) -> Unit,
     onClose: () -> Unit,
@@ -71,8 +72,18 @@ fun PlaybackOptionsScreen(
     val listState = rememberLazyListState()
     val firstFocus = remember { FocusRequester() }
     var focusedIndex by remember { mutableIntStateOf(0) }
+    val bufferedMillis = (timeShiftState.currentPositionMs - timeShiftState.startPositionMs).coerceAtLeast(0L)
+    val timeShiftPosition = stringResource(R.string.timeshift_buffer_elapsed, formatPosition(bufferedMillis))
 
-    val items = remember(trackState, aspectMode) {
+    val items = remember(
+        trackState,
+        timeShiftState,
+        timeShiftPosition,
+        aspectMode,
+        onToggleTeletext,
+        onToggleTimeShift,
+        onSeekTimeShift,
+    ) {
         buildList<OptionItem> {
             add(OptionItem.Header(HeaderKind.ASPECT))
             AspectMode.entries.forEach { mode ->
@@ -123,10 +134,13 @@ fun PlaybackOptionsScreen(
                     )
                 }
             }
+            add(OptionItem.Header(HeaderKind.TELETEXT))
+            add(OptionItem.Action(null, R.string.options_teletext, false, onToggleTeletext))
             add(OptionItem.Header(HeaderKind.TIMESHIFT))
             if (!timeShiftState.available) {
                 add(OptionItem.Hint(R.string.timeshift_unsupported))
             } else {
+                add(OptionItem.Message(timeShiftPosition))
                 add(OptionItem.Action(
                     label = null,
                     labelRes = if (timeShiftState.paused) R.string.timeshift_resume else R.string.timeshift_pause,
@@ -187,6 +201,13 @@ fun PlaybackOptionsScreen(
                             modifier = Modifier.padding(vertical = 4.dp),
                         )
 
+                        is OptionItem.Message -> Text(
+                            text = item.text,
+                            color = Color(0xFFB0C1D5),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+
                         is OptionItem.Action -> OptionRow(
                             label = item.label ?: stringResource(item.labelRes!!),
                             selected = item.selected,
@@ -209,12 +230,22 @@ fun PlaybackOptionsScreen(
     }
 }
 
+private fun formatPosition(milliseconds: Long): String {
+    val totalSeconds = milliseconds / 1_000L
+    val seconds = totalSeconds % 60
+    val minutes = (totalSeconds / 60) % 60
+    val hours = totalSeconds / 3_600
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
+    else "%02d:%02d".format(totalSeconds / 60, seconds)
+}
+
 @Composable
 private fun headerLabel(kind: HeaderKind): String = stringResource(
     when (kind) {
         HeaderKind.ASPECT -> R.string.options_aspect
         HeaderKind.AUDIO -> R.string.options_audio_track
         HeaderKind.SUBTITLE -> R.string.options_subtitle_track
+        HeaderKind.TELETEXT -> R.string.options_teletext
         HeaderKind.TIMESHIFT -> R.string.options_timeshift
     },
 )
@@ -301,6 +332,7 @@ private fun OptionRow(
 private sealed interface OptionItem {
     data class Header(val header: HeaderKind) : OptionItem
     data class Hint(val textRes: Int) : OptionItem
+    data class Message(val text: String) : OptionItem
     data class Action(
         val label: String?,
         val labelRes: Int?,
@@ -311,6 +343,6 @@ private sealed interface OptionItem {
     data class Footer(val labelRes: Int = R.string.epg_close, val onClick: () -> Unit) : OptionItem
 }
 
-private enum class HeaderKind { ASPECT, AUDIO, SUBTITLE, TIMESHIFT }
+private enum class HeaderKind { ASPECT, AUDIO, SUBTITLE, TELETEXT, TIMESHIFT }
 
 private val PANEL_WIDTH = 460.dp

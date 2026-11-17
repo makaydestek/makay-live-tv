@@ -2,7 +2,10 @@ package com.makay.livetv
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.app.PictureInPictureParams
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Rational
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,6 +45,20 @@ class MainActivity : ComponentActivity() {
 
     fun setLiveTvRemoteHandler(handler: ((KeyEvent) -> Boolean)?) {
         liveTvRemoteHandler = handler
+    }
+
+    /** Enters the system PiP window when this TV device supports it. */
+    fun enterLivePictureInPicture(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O ||
+            !packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        ) return false
+        return runCatching {
+            enterPictureInPictureMode(
+                PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build(),
+            )
+        }.getOrDefault(false)
     }
 
     // RestrictedApi: super.dispatchKeyEvent androidx.activity'te tanimlidir;

@@ -58,6 +58,11 @@
     <string name="epg_hint_grid">▲▼ Channel · ◀▶ Programme · OK Details · ▲ Day picker</string>
 
     <string name="playback_options">Playback options</string>
+    <string name="picture_in_picture">Play in a small window</string>
+    <string name="picture_in_picture_unavailable">This device does not support picture-in-picture.</string>
+    <string name="options_teletext">Open teletext</string>
+    <string name="teletext_unavailable">Teletext is not provided by this channel or tuner.</string>
+    <string name="timeshift_buffer_elapsed">Since buffer start: %1$s</string>
     <string name="options_aspect">Picture mode</string>
     <string name="aspect_full">16:9 Full screen</string>
     <string name="aspect_pillar">4:3 Pillarboxed</string>
@@ -80,6 +85,9 @@
     <string name="signal_label">Signal</string>
     <string name="signal_quality_label">Quality</string>
     <string name="signal_quality_unavailable">Not provided by tuner</string>
+    <string name="signal_ber_value">BER %1$d</string>
+    <string name="signal_dbm_value">dBm %1$d</string>
+    <string name="signal_db_value">dB %1$d</string>
     <string name="channel_quick_access_hint">Right: filter/sort · Down: return to channels</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_dark">Dark</string>
@@ -250,7 +258,7 @@
     <string name="epg_range">%1$s – %2$s</string>
     <string name="settings_banner_timeout_value">%1$s</string>
     <string name="channel_backup_title">Channel preference backup</string>
-    <string name="channel_backup_desc">Export or restore favorites, hidden and skipped channels, order and names as JSON. The tuner channel database is not modified.</string>
+    <string name="channel_backup_desc">Back up favorites, hidden and skipped channels, order, names and the scanned channel list as JSON. Restore applies app preferences; the manufacturer controls the tuner channel database, so it is not changed.</string>
     <string name="channel_backup_export">Export</string>
     <string name="channel_backup_import">Import</string>
     <string name="channel_backup_exported">Channel preferences were backed up.</string>

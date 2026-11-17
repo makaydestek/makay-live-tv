@@ -66,6 +66,7 @@
             android:exported="true"
             android:label="Makay Live TV"
             android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.App.Starting"

@@ -40,6 +40,7 @@ import com.makay.livetv.player.AspectMode
 import com.makay.livetv.player.PlaybackState
 import com.makay.livetv.player.TrackState
 import com.makay.livetv.player.TimeShiftState
+import com.makay.livetv.player.TunerSignalMetrics
 import com.makay.livetv.player.TunerPlayerController
 import com.makay.livetv.timer.TimerEvent
 import com.makay.livetv.timer.TimerEventBus
@@ -178,6 +179,7 @@ fun AppRoot(
     var playbackState by remember { mutableStateOf<PlaybackState>(PlaybackState.Idle) }
     var controller by remember { mutableStateOf<TunerPlayerController?>(null) }
     var signalStrength by remember { mutableStateOf<Int?>(null) }
+    var signalMetrics by remember { mutableStateOf<TunerSignalMetrics?>(null) }
     var trackState by remember { mutableStateOf(TrackState()) }
     var timeShiftState by remember { mutableStateOf(TimeShiftState()) }
     var bannerVisible by remember { mutableStateOf(false) }
@@ -291,6 +293,10 @@ fun AppRoot(
         ready.signalStrength.collect { signalStrength = it }
     }
     LaunchedEffect(controller) {
+        val ready = controller ?: run { signalMetrics = null; return@LaunchedEffect }
+        ready.signalMetrics.collect { signalMetrics = it }
+    }
+    LaunchedEffect(controller) {
         val ready = controller ?: return@LaunchedEffect
         ready.timeShiftState.collect { timeShiftState = it }
     }
@@ -361,6 +367,7 @@ fun AppRoot(
         else -> LiveTvScreen(
             activeChannel = if (ageBlockedProgram == null) activeChannel else null,
             signalStrength = signalStrength,
+            signalMetrics = signalMetrics,
             channelsLoading = channelsLoading,
             epg = if (ageBlockedProgram == null) activeChannel?.let { epgMap[it.id] } else null,
             playbackState = playbackState,
@@ -407,6 +414,20 @@ fun AppRoot(
         AppScreen.MainMenu -> MainMenuScreen(
             recordings = recordings,
             onOpenSetup = { launchTunerSetup() },
+            onEnterPictureInPicture = {
+                navigator.popTo(AppScreen.LiveTv)
+                scope.launch {
+                    delay(250)
+                    val entered = (context as? com.makay.livetv.MainActivity)?.enterLivePictureInPicture() == true
+                    if (!entered) {
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.picture_in_picture_unavailable),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            },
             onSelect = { destination ->
                 if (destination == AppScreen.Recordings || destination == AppScreen.Timers) {
                     scope.launch { viewModel.refreshRecordings() }
@@ -529,6 +550,17 @@ fun AppRoot(
             onAspectChange = { viewModel.settings.setAspectMode(it) },
             onSelectAudio = { controller?.selectAudioTrack(it) },
             onSelectSubtitle = { controller?.selectSubtitleTrack(it) },
+            onToggleTeletext = {
+                val handled = controller?.toggleTeletext() == true
+                navigator.pop()
+                if (!handled) {
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.teletext_unavailable),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            },
             onToggleTimeShift = {
                 if (timeShiftState.paused) controller?.resumeTimeShift() else controller?.pauseTimeShift()
             },

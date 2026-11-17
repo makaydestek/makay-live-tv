@@ -63,6 +63,11 @@
 
     <!-- Oynatma secenekleri -->
     <string name="playback_options">Oynatma Seçenekleri</string>
+    <string name="picture_in_picture">Küçük pencerede oynat</string>
+    <string name="picture_in_picture_unavailable">Bu cihaz küçük pencere oynatmayı desteklemiyor.</string>
+    <string name="options_teletext">Teletext’i aç</string>
+    <string name="teletext_unavailable">Teletext bu kanal veya tuner tarafından sunulmuyor.</string>
+    <string name="timeshift_buffer_elapsed">Tampon başlangıcından: %1$s</string>
     <string name="options_aspect">Görüntü modu</string>
     <string name="aspect_full">16:9 Tam ekran</string>
     <string name="aspect_pillar">4:3 Sütunlu</string>
@@ -86,6 +91,9 @@
     <string name="signal_label">Sinyal</string>
     <string name="signal_quality_label">Kalite</string>
     <string name="signal_quality_unavailable">Tuner ölçüm sunmuyor</string>
+    <string name="signal_ber_value">BER %1$d</string>
+    <string name="signal_dbm_value">dBm %1$d</string>
+    <string name="signal_db_value">dB %1$d</string>
     <string name="channel_quick_access_hint">Sağ: filtre/sıralama · Aşağı: kanallara dön</string>
     <string name="settings_theme">Tema</string>
     <string name="settings_theme_dark">Koyu</string>
@@ -265,7 +273,7 @@
     <string name="notif_permission_title">Bildirim izni gerekli</string>
     <string name="notif_permission_body">Zamanlayıcı hatırlatmaları için Android ayarlarında Makay Live TV bildirimlerine izin verin. Zamanlayıcı kurulmadı.</string>
     <string name="channel_backup_title">Kanal tercihleri yedeği</string>
-    <string name="channel_backup_desc">Favoriler, gizlenenler, atlananlar, kanal sırası ve adlarını JSON dosyasına aktarın veya geri yükleyin. Tuner kanal tablosu etkilenmez.</string>
+    <string name="channel_backup_desc">Favoriler, gizlenenler, atlananlar, kanal sırası ve adları ile taramadaki kanal listesini JSON olarak yedekleyin. Geri yükleme uygulama tercihlerini uygular; tuner kanal tablosunu üretici yönettiği için değiştirmez.</string>
     <string name="channel_backup_export">Dışa aktar</string>
     <string name="channel_backup_import">İçe aktar</string>
     <string name="channel_backup_exported">Kanal tercihleri yedeklendi.</string>

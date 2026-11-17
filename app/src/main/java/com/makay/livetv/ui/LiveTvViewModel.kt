@@ -323,7 +323,7 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Kanal kişiselleştirmelerini kullanıcı tarafından seçilen dosyaya yazar. */
     suspend fun exportChannelPreferences(uri: android.net.Uri): Boolean = runCatching {
-        val json = prefs.exportBackup()
+        val json = prefs.exportBackup(_allChannels.value)
         withContext(Dispatchers.IO) {
             getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { output ->
                 output.writer(Charsets.UTF_8).use { it.write(json) }

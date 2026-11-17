@@ -123,7 +123,7 @@ class ChannelPreferences private constructor(context: Context) {
     }
 
     /** Kanal tablosuna dokunmadan uygulama ici kanal tercihlerini JSON'a aktarir. */
-    suspend fun exportBackup(): String {
+    suspend fun exportBackup(channels: List<Channel> = emptyList()): String {
         val current = store.data.first()
         val backup = JsonObject().apply {
             addProperty("formatVersion", BACKUP_FORMAT_VERSION)
@@ -136,6 +136,21 @@ class ChannelPreferences private constructor(context: Context) {
             add("recent", current.stringArray(KEY_RECENT))
             addProperty("lastChannel", current[KEY_LAST_CHANNEL].orEmpty())
             addProperty("renamedChannels", current[KEY_RENAMES].orEmpty())
+            // Salt-okunur TvProvider anlik goruntusu: baska cihaza kanal tablosu
+            // yazmak icin degil, tarama sonrasi eslestirme/referans icin.
+            add("channelSnapshot", JsonArray().apply {
+                channels.take(MAX_BACKUP_ITEMS).forEach { channel ->
+                    add(JsonObject().apply {
+                        addProperty("inputId", channel.inputId)
+                        addProperty("inputLabel", channel.inputLabel)
+                        addProperty("displayNumber", channel.displayNumber)
+                        addProperty("displayName", channel.displayName)
+                        addProperty("serviceType", channel.serviceType)
+                        addProperty("videoFormat", channel.videoFormat)
+                        addProperty("type", channel.type.name)
+                    })
+                }
+            })
         }
         return Gson().toJson(backup)
     }
@@ -147,7 +162,8 @@ class ChannelPreferences private constructor(context: Context) {
     suspend fun importBackup(raw: String): Boolean {
         if (raw.length > MAX_BACKUP_CHARS) return false
         val parsed = runCatching { JsonParser.parseString(raw).asJsonObject }.getOrNull() ?: return false
-        if (runCatching { parsed.get("formatVersion")?.asInt }.getOrNull() != BACKUP_FORMAT_VERSION) return false
+        val formatVersion = runCatching { parsed.get("formatVersion")?.asInt }.getOrNull() ?: return false
+        if (formatVersion !in MIN_SUPPORTED_BACKUP_VERSION..BACKUP_FORMAT_VERSION) return false
 
         fun readList(name: String): List<String>? = runCatching {
             parsed.getAsJsonArray(name).map { it.asString }
@@ -260,7 +276,8 @@ class ChannelPreferences private constructor(context: Context) {
     }
 
     companion object {
-        private const val BACKUP_FORMAT_VERSION = 1
+        private const val BACKUP_FORMAT_VERSION = 2
+        private const val MIN_SUPPORTED_BACKUP_VERSION = 1
         private const val MAX_BACKUP_CHARS = 1_000_000
         private const val MAX_BACKUP_ITEMS = 20_000
         private const val MAX_BACKUP_KEY_CHARS = 512
