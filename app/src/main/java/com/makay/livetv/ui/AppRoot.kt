@@ -450,7 +450,8 @@ fun AppRoot(
                 revealChannelInfo()
                 navigator.popTo(AppScreen.LiveTv)
             },
-            onFocused = viewModel::selectChannel,
+            // Odak sadece listede gezinir; kanal tune işlemi OK/click ile seçilince yapılır.
+            onFocused = {},
             onScanChannels = { launchTunerSetup() },
             filter = filter,
             sort = sort,
