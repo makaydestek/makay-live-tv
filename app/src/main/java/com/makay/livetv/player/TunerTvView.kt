@@ -19,11 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,9 +37,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 /** TvView'un oynatma durumu — UI katmani bunun uzerinden bindirme cizer. */
@@ -98,8 +98,10 @@ class TunerPlayerController(
     private var confirmedChannelId: Long? = null
     /** Bir kez goruntu basariliysa oturum hazirdir; zap sirasinda tune tekrari yapilmaz. */
     private var hasConfirmedPlayback = false
-    private var tuneInProgress = false
+    private val tuneInProgress = MutableStateFlow(false)
     private var tuneStartedAtMs = 0L
+    private var initialTuneRetried = false
+    private var weakSignalDuringTune = false
 
     private val _trackState = MutableStateFlow(TrackState())
     private val _timeShiftState = MutableStateFlow(TimeShiftState())
@@ -122,7 +124,9 @@ class TunerPlayerController(
     }
 
     private val sessionCallback = object : TvView.TvInputCallback() {
-        override fun onVideoAvailable(inputId: String?) = confirmPlaying()
+        override fun onVideoAvailable(inputId: String?) {
+            if (inputId == currentChannel?.inputId) confirmPlaying()
+        }
 
         override fun onSignalStrengthUpdated(inputId: String, strength: Int) {
             if (inputId == currentChannel?.inputId) {
@@ -146,30 +150,33 @@ class TunerPlayerController(
         }
 
         override fun onContentBlocked(inputId: String?, rating: android.media.tv.TvContentRating?) {
-            tuneInProgress = false
-            currentChannel?.let { onState(PlaybackState.Error(it, str(R.string.err_parental_blocked))) }
+            val channel = currentChannel?.takeIf { it.inputId == inputId } ?: return
+            tuneInProgress.value = false
+            onState(PlaybackState.Error(channel, str(R.string.err_parental_blocked)))
         }
 
         override fun onVideoUnavailable(inputId: String?, reason: Int) {
-            val ch = currentChannel ?: return
+            val ch = currentChannel?.takeIf { it.inputId == inputId } ?: return
             when (reason) {
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING,
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING,
-                -> Unit // henuz hazir degil; tune tekrar denemesi devrede
+                -> Unit
 
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL -> {
-                    // OEM TIF can report a temporary weak signal while the
-                    // initial tune is still settling. Don't replace the live
-                    // surface with an error before playback has ever started.
-                    if (!hasConfirmedPlayback && tuneInProgress &&
-                        SystemClock.elapsedRealtime() - tuneStartedAtMs < INITIAL_SIGNAL_GRACE_MS
-                    ) return
-                    tuneInProgress = false
+                    // The tuner can briefly report weak signal while locking to a channel.
+                    if (tuneInProgress.value &&
+                        SystemClock.elapsedRealtime() - tuneStartedAtMs < TUNE_SIGNAL_GRACE_MS
+                    ) {
+                        weakSignalDuringTune = true
+                        return
+                    }
+                    tuneInProgress.value = false
+                    confirmedChannelId = null
                     onState(PlaybackState.Error(ch, str(R.string.err_weak_signal)))
                 }
 
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY -> {
-                    tuneInProgress = false
+                    tuneInProgress.value = false
                     hasConfirmedPlayback = true
                     confirmedChannelId = ch.id
                     onState(PlaybackState.Playing(ch)) // radyo / ses-only yayin
@@ -181,17 +188,17 @@ class TunerPlayerController(
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_CAS_LICENSE_EXPIRED,
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_CAS_CARD_INVALID,
                 -> {
-                    tuneInProgress = false
+                    tuneInProgress.value = false
                     onState(PlaybackState.Error(ch, str(R.string.err_scrambled_ca)))
                 }
 
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_INSUFFICIENT_RESOURCE -> {
-                    tuneInProgress = false
+                    tuneInProgress.value = false
                     onState(PlaybackState.Error(ch, str(R.string.err_tuner_busy)))
                 }
 
                 else -> {
-                    tuneInProgress = false
+                    tuneInProgress.value = false
                     onState(
                         PlaybackState.Error(
                             ch,
@@ -205,8 +212,12 @@ class TunerPlayerController(
 
     private fun confirmPlaying() {
         val ch = currentChannel ?: return
-        tuneInProgress = false
+        tuneInProgress.value = false
         hasConfirmedPlayback = true
+        if (confirmedChannelId != ch.id) {
+            val elapsed = SystemClock.elapsedRealtime() - tuneStartedAtMs
+            SafeLog.i(TAG, "Tune video available: channel=${ch.id}, elapsedMs=$elapsed")
+        }
         confirmedChannelId = ch.id
         onState(PlaybackState.Playing(ch))
         refreshTracks()
@@ -237,11 +248,10 @@ class TunerPlayerController(
         currentChannel = null
         confirmedChannelId = null
         hasConfirmedPlayback = false
-        tuneInProgress = false
+        tuneInProgress.value = false
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
         _signalStrength.value = null
-        _timeShiftState.value = TimeShiftState()
     }
 
     /** Kanali ayarlar. Tekrar denemeler [waitForConfirmation] tarafindan yonetilir. */
@@ -251,55 +261,53 @@ class TunerPlayerController(
             onState(PlaybackState.Error(channel, str(R.string.err_player_not_ready)))
             return
         }
-        if (confirmedChannelId == channel.id) return
+        if (currentChannel == channel && (confirmedChannelId == channel.id || tuneInProgress.value)) return
+        if (currentChannel?.inputId != channel.inputId) hasConfirmedPlayback = false
         currentChannel = channel
         _signalStrength.value = null
         confirmedChannelId = null
-        hasConfirmedPlayback = false
-        tuneInProgress = true
         tuneStartedAtMs = SystemClock.elapsedRealtime()
+        initialTuneRetried = false
+        weakSignalDuringTune = false
+        tuneInProgress.value = true
         onState(PlaybackState.Tuning(channel))
         runCatching {
             view.tune(channel.inputId, TvContract.buildChannelUri(channel.id))
         }.onFailure { err ->
-            tuneInProgress = false
+            tuneInProgress.value = false
             SafeLog.e(TAG, "tune basarisiz", err)
             onState(PlaybackState.Error(channel, str(R.string.err_tune_failed)))
         }
     }
 
-    /** Mevcut DTVKit ayarı sonuçlanana kadar yeni tuner komutunu beklet. */
-    suspend fun awaitTuneSlot() {
-        while (tuneInProgress) {
-            if (SystemClock.elapsedRealtime() - tuneStartedAtMs >= MAX_TUNE_IN_FLIGHT_MS) {
-                tuneInProgress = false
-                SafeLog.w(TAG, "Tune callback zaman aşımı; son kanal isteğine geçiliyor")
-                break
-            }
-            delay(TUNE_SLOT_POLL_MS)
+    /** Wait for the active request's callback before sending the latest selection. */
+    suspend fun awaitTuneSlot(channel: Channel) {
+        if (!tuneInProgress.value || currentChannel == channel) return
+        val remaining = MAX_TUNE_IN_FLIGHT_MS - (SystemClock.elapsedRealtime() - tuneStartedAtMs)
+        if (remaining > 0) {
+            withTimeoutOrNull(remaining) { tuneInProgress.first { !it } }
         }
     }
 
-    /** İlk TIF oturumu geç açılırsa tek sefer yeniden dener. Sonraki zaplerde
-     * tune tekrarı yapmaz; tekrarlanan tune decoder kilidini yeniden başlatıp
-     * kanal geçişini uzatabiliyor.
-     */
-    suspend fun waitForConfirmation(
-        channel: Channel,
-        retryAfterMs: Long = 1_800,
-        finalWaitMs: Long = 2_500,
-    ) {
-        if (!hasConfirmedPlayback) {
-            delay(retryAfterMs)
-            if (!currentCoroutineContext().isActive) return
-            if (currentChannel?.id != channel.id || confirmedChannelId == channel.id) return
+    suspend fun waitForConfirmation(channel: Channel) {
+        if (!tuneInProgress.value || currentChannel != channel) return
+        if (!hasConfirmedPlayback && !initialTuneRetried) {
+            val retryIn = INITIAL_RETRY_DELAY_MS - (SystemClock.elapsedRealtime() - tuneStartedAtMs)
+            val finished = withTimeoutOrNull(retryIn) {
+                tuneInProgress.first { !it }
+            }
+            if (finished != null || !tuneInProgress.value || currentChannel != channel) return
             val view = tvView ?: return
+            initialTuneRetried = true
             runCatching { view.tune(channel.inputId, TvContract.buildChannelUri(channel.id)) }
                 .onFailure { SafeLog.w(TAG, "ilk tune yeniden deneme", it) }
         }
-        delay(finalWaitMs)
-        if (currentChannel?.id == channel.id && confirmedChannelId != channel.id) {
-            onState(PlaybackState.Error(channel, str(R.string.err_tune_timeout)))
+        val remaining = TUNE_TIMEOUT_MS - (SystemClock.elapsedRealtime() - tuneStartedAtMs)
+        val finished = withTimeoutOrNull(remaining) { tuneInProgress.first { !it } }
+        if (finished == null && tuneInProgress.value && currentChannel == channel) {
+            tuneInProgress.value = false
+            val error = if (weakSignalDuringTune) R.string.err_weak_signal else R.string.err_tune_timeout
+            onState(PlaybackState.Error(channel, str(error)))
         }
     }
 
@@ -308,7 +316,7 @@ class TunerPlayerController(
         currentChannel = null
         confirmedChannelId = null
         hasConfirmedPlayback = false
-        tuneInProgress = false
+        tuneInProgress.value = false
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
         _signalStrength.value = null
@@ -434,7 +442,7 @@ class TunerPlayerController(
 
     companion object {
         private const val TAG = "TunerPlayer"
-        private const val INITIAL_SIGNAL_GRACE_MS = 4_000L
+        private const val TUNE_SIGNAL_GRACE_MS = 4_000L
         private const val ACTION_FULLPAGE_TELETEXT = "com.google.android.tv.dtvinput.play.mode.FULLPAGE_TELETEXT"
 
         /** Yaygin dil kodlari (ISO 639-1/2) → dilin kendi yazimi. */
@@ -517,7 +525,6 @@ fun TunerTvView(
     val stateCallback by rememberUpdatedState(onState)
     val readyCallback by rememberUpdatedState(onControllerReady)
     val controller = remember { TunerPlayerController(context, { s -> stateCallback(s) }) }
-    var lastTuneAt by remember(controller) { mutableLongStateOf(0L) }
 
     LaunchedEffect(controller) { readyCallback(controller) }
 
@@ -592,24 +599,17 @@ fun TunerTvView(
         view.awaitAttachedToWindow()
         // OEM Live TV waits for its current TV session/tune state. Keep one
         // request in flight and let newer selections replace the pending one.
-        controller.awaitTuneSlot()
-        if (!currentCoroutineContext().isActive) return@LaunchedEffect
-        val remaining = MIN_TUNE_INTERVAL_MS - (SystemClock.elapsedRealtime() - lastTuneAt)
-        if (remaining > 0) delay(remaining)
+        controller.awaitTuneSlot(target)
         if (!currentCoroutineContext().isActive) return@LaunchedEffect
         controller.tune(target)
-        lastTuneAt = SystemClock.elapsedRealtime()
         controller.waitForConfirmation(target)
     }
 }
 
-// Kumandadaki kısa seri basışlarda ara kanallara tune isteği göndermek DTVKit
-// oturumunda istek biriktiriyor. Son seçime 400 ms içinde ulaşıldığında tek
-// tune komutu gönder; tekil basışın ek gecikmesi TV kullanımında fark edilmesin.
-private const val CHANNEL_TUNE_DEBOUNCE_MS = 120L
-private const val MIN_TUNE_INTERVAL_MS = 700L
+private const val CHANNEL_TUNE_DEBOUNCE_MS = 60L
 private const val MAX_TUNE_IN_FLIGHT_MS = 1_600L
-private const val TUNE_SLOT_POLL_MS = 80L
+private const val INITIAL_RETRY_DELAY_MS = 1_800L
+private const val TUNE_TIMEOUT_MS = 4_300L
 
 private suspend fun TvView.awaitAttachedToWindow() {
     if (isAttachedToWindow) return

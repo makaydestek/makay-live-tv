@@ -144,13 +144,39 @@ echo.
 REM ============================================================
 echo [1/6] Acik degisiklikler commit ediliyor...
 REM ============================================================
-git add -A >nul 2>&1
-git diff --cached --quiet >nul 2>&1
+REM Eski surumlerde izlenen Gradle gecici dosyalarini da atla.
+set "INDEX_LOCK="
+for /f "delims=" %%L in ('git rev-parse --git-path index.lock') do set "INDEX_LOCK=%%L"
+if not defined INDEX_LOCK (
+    echo [HATA] Git indeks kilidinin yolu bulunamadi.
+    goto :END_FAIL
+)
+if exist "!INDEX_LOCK!" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%\tools\recover-git-index-lock.ps1" -LockPath "!INDEX_LOCK!"
+    if errorlevel 1 goto :END_FAIL
+)
+echo  Git: proje dosyalari hazirlaniyor...
+git add -A -- . ":(top,exclude).gradle-local"
 if errorlevel 1 (
-    call "%~dp0tool\git_commit.cmd" -m "Makay Live TV v!VERSION!: birikimli guncelleme" >nul 2>&1
+    echo [HATA] Git dosyalari hazirlayamadi.
+    goto :END_FAIL
+)
+git diff --cached --quiet -- .gradle-local
+if errorlevel 1 (
+    echo [HATA] Git indeksinde Gradle gecici dosyalari var veya indeks okunamadi.
+    echo        Hazirlanan dosyalari "git diff --cached --name-only" ile kontrol edin.
+    goto :END_FAIL
+)
+git diff --cached --quiet
+if errorlevel 2 (
+    echo [HATA] Git indeksi kontrol edilemedi.
+    goto :END_FAIL
+)
+if errorlevel 1 (
+    echo  Git: commit olusturuluyor...
+    call "%~dp0tool\git_commit.cmd" -m "Makay Live TV v!VERSION!: birikimli guncelleme"
     if errorlevel 1 (
         echo [HATA] Commit basarisiz.
-        call "%~dp0tool\git_commit.cmd" -m "Makay Live TV v!VERSION!: birikimli guncelleme"
         goto :END_FAIL
     )
     for /f "delims=" %%H in ('git rev-parse --short HEAD 2^>nul') do set "C1=%%H"
