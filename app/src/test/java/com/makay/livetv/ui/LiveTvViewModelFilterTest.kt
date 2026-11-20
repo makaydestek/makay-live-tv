@@ -5,6 +5,7 @@ import com.makay.livetv.domain.model.ChannelFilter
 import com.makay.livetv.domain.model.ChannelSort
 import com.makay.livetv.domain.model.ChannelType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,6 +32,31 @@ class LiveTvViewModelFilterTest {
         serviceType = serviceType,
         isBrowsable = browsable,
     )
+
+    @Test
+    fun `acilista silinen gizli ve kilitli kanallar secilmez`() {
+        val deleted = channel(1, "1", "Silinen").copy(isLocallyDeleted = true)
+        val hidden = channel(2, "2", "Gizli").copy(isLocallyHidden = true)
+        val locked = channel(3, "3", "Kilitli").copy(isLocallyLocked = true)
+        val playable = channel(4, "4", "Acik")
+        assertEquals(
+            playable,
+            LiveTvViewModel.startupChannel(listOf(deleted, hidden, locked, playable), ChannelSort.NUMBER, deleted.id),
+        )
+        assertNull(LiveTvViewModel.startupChannel(listOf(deleted, hidden, locked), ChannelSort.NUMBER))
+    }
+
+    @Test
+    fun `kanal gecisi kilitli ve atlanacak kanallari iki yonde gecer`() {
+        val first = channel(1, "1", "Bir")
+        val locked = channel(2, "2", "Kilitli").copy(isLocallyLocked = true)
+        val skipped = channel(3, "3", "Atlanan").copy(isLocallySkipped = true)
+        val last = channel(4, "4", "Dort")
+        val channels = listOf(first, locked, skipped, last)
+        assertEquals(last, LiveTvViewModel.findZapTarget(channels, first.id, 1))
+        assertEquals(first, LiveTvViewModel.findZapTarget(channels, last.id, -1))
+        assertNull(LiveTvViewModel.findZapTarget(listOf(locked), null, 1))
+    }
 
     @Test
     fun `numara siralamasi dogal sayisal sirada olmali`() {

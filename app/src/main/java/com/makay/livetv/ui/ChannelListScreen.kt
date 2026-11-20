@@ -86,7 +86,7 @@ fun ChannelListScreen(
     onBeginMove: () -> Unit,
     onSetLocked: (Channel, Boolean) -> Boolean,
     onVerifyPin: (String) -> Boolean,
-    onSelect: (Channel) -> Unit,
+    onSelect: (Channel, Boolean) -> Unit,
     onFocused: (Channel) -> Unit,
     onScanChannels: () -> Unit,
     filter: ChannelFilter,
@@ -247,7 +247,7 @@ fun ChannelListScreen(
                         moving = movingChannelId == channel.id,
                         focusRequester = channelFocusRequesters.getValue(channel.id),
                         compact = true,
-                        onClick = { onSelect(channel) },
+                        onClick = { pinVerified -> onSelect(channel, pinVerified) },
                         onFocused = { panelActivity++; onPanelActivity(); onFocused(channel) },
                         onStartMoving = { movingChannelId = channel.id; onBeginMove() },
                         onFinishMoving = { movingChannelId = null },
@@ -283,7 +283,7 @@ private fun ChannelRow(
     moving: Boolean,
     focusRequester: FocusRequester,
     compact: Boolean = false,
-    onClick: () -> Unit,
+    onClick: (pinVerified: Boolean) -> Unit,
     onFocused: () -> Unit,
     onStartMoving: () -> Unit,
     onFinishMoving: () -> Unit,
@@ -317,7 +317,7 @@ private fun ChannelRow(
             moving -> onFinishMoving()
             editing -> openActions()
             channel.isLocallyLocked -> { pinUnlockChannel = false; showUnlock = true }
-            else -> onClick()
+            else -> onClick(false)
         }
     }
     val longClick = {
@@ -627,7 +627,7 @@ private fun ChannelRow(
                         if (pinUnlockChannel) {
                             onSetLocked(channel, false)
                             pinUnlockChannel = false
-                        } else onClick()
+                        } else onClick(true)
                     } else pinFailed = true
                 }) { Text(stringResource(R.string.parental_unlock_watch)) }
             },

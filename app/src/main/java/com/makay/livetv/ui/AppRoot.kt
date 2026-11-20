@@ -479,10 +479,11 @@ fun AppRoot(
             onBeginMove = viewModel::prepareChannelEditing,
             onSetLocked = viewModel::setChannelLocked,
             onVerifyPin = viewModel::verifyParentalPin,
-            onSelect = { channel ->
-                viewModel.selectChannel(channel)
-                revealChannelInfo()
-                navigator.popTo(AppScreen.LiveTv)
+            onSelect = { channel, pinVerified ->
+                if (viewModel.selectChannel(channel, pinVerified)) {
+                    revealChannelInfo()
+                    navigator.popTo(AppScreen.LiveTv)
+                }
             },
             // Odak sadece listede gezinir; kanal tune işlemi OK/click ile seçilince yapılır.
             onFocused = {},
@@ -504,8 +505,7 @@ fun AppRoot(
             epg = epgMap,
             activeChannelId = activeChannel?.id,
             onSelectChannel = { channel ->
-                viewModel.selectChannel(channel)
-                navigator.popTo(AppScreen.LiveTv)
+                if (viewModel.selectChannel(channel)) navigator.popTo(AppScreen.LiveTv)
             },
             onLoadRange = { list, from, to -> viewModel.programsInRange(list, from, to) },
             scheduledProgramTimers = timers.asSequence()
@@ -700,8 +700,7 @@ fun AppRoot(
             confirmButton = {
                 Row {
                     TextButton(onClick = {
-                        if (eventChannel != null) {
-                            viewModel.selectChannel(eventChannel)
+                        if (eventChannel != null && viewModel.selectChannel(eventChannel)) {
                             revealChannelInfo()
                             navigator.popTo(AppScreen.LiveTv)
                         }

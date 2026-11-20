@@ -157,18 +157,21 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
      * Kanal secer. Gecersiz kimlik veya ayni kanal icin islem yapmaz
      * (gereksiz tune = yayin kesintisi olur).
      */
-    fun selectChannel(channel: Channel) {
-        if (_activeChannel.value?.id == channel.id) return
-        _activeChannel.value = channel
+    fun selectChannel(channel: Channel, pinVerified: Boolean = false): Boolean {
+        val selected = channelById(channel.id) ?: return false
+        if (selected.isLocallyDeleted || (selected.isLocallyLocked && !pinVerified)) return false
+        if (_activeChannel.value?.id == selected.id) return true
+        _activeChannel.value = selected
         // Kumandadan gelen hızlı zap dizilerinde her ara kanal için DataStore
         // yazma kuyruğu oluşturma; ekrandaki seçim hemen değişsin, yalnızca
         // kullanıcının son kanalını kısa bir duraklamadan sonra kaydet.
         recentChannelJob?.cancel()
         recentChannelJob = viewModelScope.launch {
             delay(RECENT_CHANNEL_SAVE_DEBOUNCE_MS)
-            runCatching { prefs.markWatched(channel) }
+            runCatching { prefs.markWatched(selected) }
                 .onFailure { SafeLog.w(TAG, "markWatched", it) }
         }
+        return true
     }
 
     /**
@@ -179,33 +182,17 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Sırali listede bir sonraki/onceki kanala gecer (DPAD yukari/asagi). */
     fun zap(delta: Int) {
-        val list = visibleChannels.value
-        if (list.isEmpty()) {
-            SafeLog.w(TAG, "Zap yok sayildi: kanal listesi bos")
-            return
-        }
         val current = _activeChannel.value
-        val idx = list.indexOfFirst { it.id == current?.id }
-        var nextIdx = when {
-            idx < 0 -> if (delta >= 0) 0 else list.lastIndex
-            else -> (idx + delta).mod(list.size)
-        }
-        // Skip isaretli kanallari yonunde gec; liste tamamen skip ise
-        // ilk adimda kal (kullanici yine de bir kanala gecer).
-        val firstCandidate = nextIdx
-        while (list[nextIdx].isLocallySkipped) {
-            nextIdx = (nextIdx + delta).mod(list.size)
-            if (nextIdx == firstCandidate) break
-        }
-        SafeLog.d(TAG, "Zap delta=$delta current=${current?.id} next=${list[nextIdx].id} (${list[nextIdx].displayName})")
-        selectChannel(list[nextIdx])
+        val next = findZapTarget(visibleChannels.value, current?.id, delta) ?: return
+        SafeLog.d(TAG, "Zap delta=$delta current=${current?.id} next=${next.id} (${next.displayName})")
+        selectChannel(next)
     }
 
     /** Kanal numarasindan dogrudan tune (sayi tusu). */
     fun zapByNumber(number: String): Boolean {
         val normalized = number.trim().trimStart('0').ifEmpty { "0" }
         val match = _allChannels.value.firstOrNull { channel ->
-            if (channel.isLocallyDeleted) return@firstOrNull false
+            if (channel.isLocallyDeleted || channel.isLocallyLocked) return@firstOrNull false
             val display = channel.displayNumber.trim().replace(',', '.')
             val exact = display.trimStart('0').ifEmpty { "0" } == normalized
             val integerEquivalent = display.toDoubleOrNull()?.let { value ->
@@ -213,8 +200,7 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
             } == true
             exact || integerEquivalent
         } ?: return false
-        selectChannel(match)
-        return true
+        return selectChannel(match)
     }
 
     /**
@@ -396,7 +382,14 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         val fresh = parentalStore.applyTo(prefs.applyTo(channelsRepo.loadChannels()))
         _allChannels.value = fresh
         val activeId = _activeChannel.value?.id
-        fresh.firstOrNull { it.id == activeId }?.let { _activeChannel.value = it }
+        val active = fresh.firstOrNull { it.id == activeId } ?: return
+        if (active.isLocallyDeleted) {
+            recentChannelJob?.cancel()
+            _activeChannel.value = null
+            startupChannel(fresh, _sort.value)?.let { selectChannel(it) }
+        } else {
+            _activeChannel.value = active
+        }
     }
 
     fun hasParentalPin(): Boolean = parentalStore.hasPin
@@ -553,9 +546,7 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         val startLast = settings.startWithLastChannel.first()
         val lastId = if (startLast) prefs.lastChannelId.first() else null
         val lastKey = if (startLast) prefs.lastChannelKey.first() else null
-        val target = lastId?.let { id -> channels.firstOrNull { it.id == id } }
-            ?: lastKey?.let { key -> channels.firstOrNull { ChannelPreferences.favoriteKeyOf(it) == key } }
-            ?: sortChannels(channels).firstOrNull()
+        val target = startupChannel(channels, _sort.value, lastId, lastKey)
         if (target != null && _activeChannel.value == null) {
             _activeChannel.value = target
         }
@@ -675,6 +666,35 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         private const val INITIAL_CHANNEL_RETRY_DELAY_MS = 900L
         private const val RECENT_CHANNEL_SAVE_DEBOUNCE_MS = 700L
         private const val MAX_CHANNEL_BACKUP_CHARS = 1_000_000
+
+        internal fun startupChannel(
+            channels: List<Channel>,
+            sort: ChannelSort,
+            lastId: Long? = null,
+            lastKey: String? = null,
+        ): Channel? {
+            val playable = filterChannels(channels, ChannelFilter.ALL, sort, "")
+                .filterNot { it.isLocallyLocked }
+            return playable.firstOrNull { it.id == lastId }
+                ?: playable.firstOrNull { lastKey != null && ChannelPreferences.favoriteKeyOf(it) == lastKey }
+                ?: playable.firstOrNull()
+        }
+
+        internal fun findZapTarget(channels: List<Channel>, activeId: Long?, delta: Int): Channel? {
+            if (channels.isEmpty() || delta == 0) return null
+            val step = if (delta > 0) 1 else -1
+            val activeIndex = channels.indexOfFirst { it.id == activeId }
+            val start = if (activeIndex >= 0) activeIndex + step else if (step > 0) 0 else channels.lastIndex
+            var skippedFallback: Channel? = null
+            repeat(channels.size) { offset ->
+                val candidate = channels[(start + offset * step).mod(channels.size)]
+                if (!candidate.isLocallyLocked && !candidate.isLocallyDeleted) {
+                    if (!candidate.isLocallySkipped) return candidate
+                    if (skippedFallback == null) skippedFallback = candidate
+                }
+            }
+            return skippedFallback
+        }
 
         /**
          * Filtre + arama + siralama uygular.
