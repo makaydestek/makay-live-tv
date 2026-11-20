@@ -466,6 +466,17 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         }.onFailure { SafeLog.w(TAG, "refreshEpg", it) }
     }
 
+    suspend fun refreshBannerEpg(channel: Channel) {
+        val now = System.currentTimeMillis()
+        val cached = _epg.value[channel.id]
+        if (cached?.current?.isLiveAt(now) == true && cached.next?.startTimeUtcMillis?.let { it > now } == true) return
+
+        val updated = epgRepo.nowAndNext(listOf(channel), now)[channel.id] ?: return
+        if (updated.current != null || updated.next != null) {
+            _epg.value = _epg.value + (channel.id to updated)
+        }
+    }
+
     /** Belirli bir kanalin gunluk akisi (EPG ekrani icin). */
     suspend fun dayTimeline(channel: Channel, dayStartUtc: Long, dayEndUtc: Long) =
         epgRepo.dayTimeline(channel, dayStartUtc, dayEndUtc)
