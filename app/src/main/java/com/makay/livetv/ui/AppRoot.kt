@@ -179,7 +179,6 @@ fun AppRoot(
 
     var playbackState by remember { mutableStateOf<PlaybackState>(PlaybackState.Idle) }
     var controller by remember { mutableStateOf<TunerPlayerController?>(null) }
-    val signalStrength = controller?.signalStrength?.collectAsStateWithLifecycle()?.value
     var trackState by remember { mutableStateOf(TrackState()) }
     var timeShiftState by remember { mutableStateOf(TimeShiftState()) }
     var bannerVisible by remember { mutableStateOf(false) }
@@ -395,7 +394,6 @@ fun AppRoot(
             epg = if (ageBlockedProgram == null) activeChannel?.let { epgMap[it.id] } else null,
             playbackState = playbackState,
             bannerVisible = bannerVisible,
-            signalStrength = signalStrength,
             numberBuffer = numberBuffer,
             isRecording = isRecording,
             focusToken = focusEpoch,

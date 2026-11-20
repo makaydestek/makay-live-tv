@@ -1,6 +1,5 @@
 package com.makay.livetv.ui
 
-import android.media.tv.TvInputManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,10 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +41,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,15 +53,10 @@ import com.makay.livetv.player.AspectMode
 import com.makay.livetv.player.PlaybackState
 import com.makay.livetv.player.TunerPlayerController
 import com.makay.livetv.player.TunerTvView
-import com.makay.livetv.tuner.DtvKitSignal
-import com.makay.livetv.tuner.DtvKitSignalReader
-import com.makay.livetv.tuner.TvInputDiscovery
 import com.makay.livetv.ui.theme.MakayPrimary
 import com.makay.livetv.ui.theme.OverlayScrim
 import com.makay.livetv.ui.theme.OverlaySurface
 import com.makay.livetv.util.TimeFormat
-import com.makay.livetv.util.SafeLog
-import kotlinx.coroutines.delay
 
 /**
  * Canli TV ekrani: TvView yayini + uzerine binen bilgi bari + hata/durum
@@ -88,7 +77,6 @@ fun LiveTvScreen(
     epg: ChannelEpg?,
     playbackState: PlaybackState,
     bannerVisible: Boolean,
-    signalStrength: Int?,
     numberBuffer: String,
     isRecording: Boolean,
     focusToken: Int,
@@ -109,35 +97,6 @@ fun LiveTvScreen(
     onForwardKey: (KeyEvent) -> Boolean,
 ) {
     val rootFocus = androidx.compose.runtime.remember { FocusRequester() }
-    val playingChannel = (playbackState as? PlaybackState.Playing)?.channel
-    val hasActivePlayback = activeChannel != null && playingChannel != null &&
-        playingChannel.id == activeChannel.id && playingChannel.inputId == activeChannel.inputId
-    val inputPackage = activeChannel?.inputId?.substringBefore('/')
-    val vendorChannel = activeChannel?.takeIf {
-        bannerVisible && hasActivePlayback && it.type.isPhysicalTuner &&
-            (inputPackage == TvInputDiscovery.DROIDLOGIC_INPUT_PACKAGE ||
-                inputPackage == TvInputDiscovery.DROIDLOGIC_INPUT_PACKAGE_ALT)
-    }
-    val resolver = LocalContext.current.contentResolver
-    var vendorSignal by remember(vendorChannel?.id, vendorChannel?.inputId) {
-        mutableStateOf<DtvKitSignal?>(null)
-    }
-    LaunchedEffect(resolver, vendorChannel?.id, vendorChannel?.inputId) {
-        val channel = vendorChannel ?: return@LaunchedEffect
-        delay(350)
-        var reportedReading = false
-        while (true) {
-            val reading = DtvKitSignalReader.read(resolver) ?: break
-            vendorSignal = reading
-            if (!reportedReading && (reading.strengthPercent != null || reading.qualityPercent != null)) {
-                SafeLog.d("DtvKitSignal", "Channel ${channel.id}: strength=${reading.strengthPercent}, quality=${reading.qualityPercent}")
-                reportedReading = true
-            }
-            delay(1_000)
-        }
-        vendorSignal = null
-    }
-
     // Odak istegi: ilk acilista ve her bindirme kapandiktan sonra tekrarlanir
     // (bindirme ekrani odagi kendi uzerine aldigindan canli TV'ye geri donulur).
     LaunchedEffect(focusToken, activeChannel?.id, liveRemoteEnabled) {
@@ -194,7 +153,7 @@ fun LiveTvScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             activeChannel?.let {
-                InfoBanner(it, epg, signalStrength.takeIf { hasActivePlayback }, vendorSignal)
+                InfoBanner(channel = it, epg = epg)
             }
         }
 
@@ -389,8 +348,6 @@ private val forwardedKeyCodes = setOf(
 private fun InfoBanner(
     channel: Channel,
     epg: ChannelEpg?,
-    signalStrength: Int?,
-    vendorSignal: DtvKitSignal?,
 ) {
     val now = System.currentTimeMillis()
     Box(
@@ -481,68 +438,6 @@ private fun InfoBanner(
                 Spacer(Modifier.height(4.dp))
                 Text(stringResource(R.string.epg_next_program, "—"), color = Color(0xFF8FA6C8), fontSize = 12.sp)
             }
-            val strength = vendorSignal?.strengthPercent
-            val quality = vendorSignal?.qualityPercent
-            val signalLabel = when (signalStrength) {
-                TvInputManager.SIGNAL_STRENGTH_STRONG -> stringResource(R.string.signal_level_strong)
-                TvInputManager.SIGNAL_STRENGTH_WEAK -> stringResource(R.string.signal_level_weak)
-                TvInputManager.SIGNAL_STRENGTH_LOST -> stringResource(R.string.signal_level_lost)
-                else -> stringResource(R.string.signal_measurement_unavailable)
-            }
-            Spacer(Modifier.height(7.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                SignalMetric(
-                    label = stringResource(R.string.signal_label),
-                    value = if (strength != null) stringResource(R.string.signal_percent, strength) else signalLabel,
-                    strength = signalStrength,
-                )
-                SignalMetric(
-                    label = stringResource(R.string.signal_quality_label),
-                    value = if (quality != null) stringResource(R.string.signal_percent, quality)
-                    else stringResource(R.string.signal_measurement_unavailable),
-                    strength = null,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SignalMetric(label: String, value: String, strength: Int?) {
-    val segmentCount = when (strength) {
-        TvInputManager.SIGNAL_STRENGTH_STRONG -> 3
-        TvInputManager.SIGNAL_STRENGTH_WEAK -> 1
-        else -> 0
-    }
-    val levelColor = when (strength) {
-        TvInputManager.SIGNAL_STRENGTH_STRONG -> Color(0xFF4ED18A)
-        TvInputManager.SIGNAL_STRENGTH_WEAK -> Color(0xFFFFC66D)
-        TvInputManager.SIGNAL_STRENGTH_LOST -> Color(0xFFFF7777)
-        else -> Color(0xFF8595A8)
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, color = Color(0xFF8595A8), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            if (strength != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    repeat(3) { index ->
-                        Box(
-                            Modifier
-                                .size(width = 5.dp, height = 10.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(if (index < segmentCount) levelColor else Color(0xFF4B5868)),
-                        )
-                    }
-                }
-            }
-            Text(
-                value,
-                color = if (strength == TvInputManager.SIGNAL_STRENGTH_WEAK || strength == TvInputManager.SIGNAL_STRENGTH_LOST) levelColor else Color(0xFFB8C9DC),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

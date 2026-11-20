@@ -108,13 +108,10 @@ class TunerPlayerController(
 
     private val _trackState = MutableStateFlow(TrackState())
     private val _timeShiftState = MutableStateFlow(TimeShiftState())
-    private val _signalStrength = MutableStateFlow<Int?>(null)
 
     /** Yayindaki ses/altyazi izleri (Compose bunu toplar). */
     val trackState: StateFlow<TrackState> = _trackState.asStateFlow()
     val timeShiftState: StateFlow<TimeShiftState> = _timeShiftState.asStateFlow()
-    /** TIF signal category (lost/weak/strong), available on Android 13+. */
-    val signalStrength: StateFlow<Int?> = _signalStrength.asStateFlow()
 
     private val timeShiftCallback = object : TvView.TimeShiftPositionCallback() {
         override fun onTimeShiftCurrentPositionChanged(inputId: String?, timeMs: Long) {
@@ -131,12 +128,6 @@ class TunerPlayerController(
     private val sessionCallback = object : TvView.TvInputCallback() {
         override fun onVideoAvailable(inputId: String?) {
             if (inputId == currentChannel?.inputId) confirmPlaying()
-        }
-
-        override fun onSignalStrengthUpdated(inputId: String, strength: Int) {
-            if (inputId == currentChannel?.inputId) {
-                _signalStrength.value = strength
-            }
         }
 
         override fun onTracksChanged(inputId: String?, tracks: MutableList<TvTrackInfo>?) {
@@ -275,7 +266,6 @@ class TunerPlayerController(
         tuneInProgress.value = false
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
-        _signalStrength.value = null
     }
 
     /** Kanali ayarlar. Tekrar denemeler [waitForConfirmation] tarafindan yonetilir. */
@@ -289,7 +279,6 @@ class TunerPlayerController(
         val inputChanged = currentChannel?.inputId != channel.inputId
         if (inputChanged) hasConfirmedPlayback = false
         currentChannel = channel
-        _signalStrength.value = null
         confirmedChannelId = null
         tuneStartedAtMs = SystemClock.elapsedRealtime()
         val previousWatchMs = playbackConfirmedAtMs?.let { tuneStartedAtMs - it }
@@ -350,7 +339,6 @@ class TunerPlayerController(
         tuneInProgress.value = false
         _trackState.value = TrackState()
         _timeShiftState.value = TimeShiftState()
-        _signalStrength.value = null
         onState(PlaybackState.Idle)
     }
 

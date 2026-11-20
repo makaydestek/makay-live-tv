@@ -77,16 +77,6 @@
     <string name="settings_about_app">Makay Live TV</string>
     <string name="settings_installed_version_desc">Installed app version and build number</string>
     <string name="update_status_current">Update status has not been checked. Select Check updates.</string>
-    <string name="signal_level_value">Signal: %1$s</string>
-    <string name="signal_level_strong">Strong</string>
-    <string name="signal_level_weak">Weak</string>
-    <string name="signal_level_lost">Lost</string>
-    <string name="signal_level_unknown">Unknown</string>
-    <string name="signal_label">Signal</string>
-    <string name="signal_quality_label">Quality</string>
-    <string name="signal_percent">%1$d%%</string>
-    <string name="signal_measurement_unavailable">No measurement received</string>
-    <string name="signal_quality_unavailable">Not provided by tuner</string>
     <string name="channel_quick_access_hint">Right: filter/sort · Down: return to channels</string>
     <string name="channel_edit_keys_hint">OK: channel actions · Hold OK: move</string>
     <string name="channel_move_mode_hint">Up/Down: move · OK/Back: finish</string>
