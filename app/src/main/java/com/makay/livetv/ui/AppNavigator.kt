@@ -16,6 +16,7 @@ sealed class AppScreen {
 
     /** Tam ekran kanal listesi (Menu / OK tusu). */
     data object ChannelList : AppScreen()
+    data object ChannelEditor : AppScreen()
 
     /** TV menu and recording drawer with top tabs. */
     data object MainMenu : AppScreen()

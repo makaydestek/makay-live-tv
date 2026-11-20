@@ -83,7 +83,7 @@ fun MainMenuScreen(
                     item { MenuEntry("⌁", stringResource(R.string.menu_setup), onClick = onOpenSetup) }
                     item { MenuEntry("☷", stringResource(R.string.playback_options), onClick = { onSelect(AppScreen.Options) }) }
                     item { MenuEntry("▣", stringResource(R.string.picture_in_picture), onClick = onEnterPictureInPicture) }
-                    item { MenuEntry("✎", stringResource(R.string.menu_channel_edit), onClick = { onSelect(AppScreen.ChannelList) }) }
+                    item { MenuEntry("✎", stringResource(R.string.menu_channel_edit), onClick = { onSelect(AppScreen.ChannelEditor) }) }
                     item { MenuEntry("▣", stringResource(R.string.menu_pvr_list), onClick = { onSelect(AppScreen.Recordings) }) }
                     item { MenuEntry("◴", stringResource(R.string.timers_title), onClick = { onSelect(AppScreen.Timers) }) }
                     item { MenuEntry("⚙", stringResource(R.string.settings), onClick = { onSelect(AppScreen.Settings) }) }

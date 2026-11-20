@@ -100,6 +100,9 @@ class TunerPlayerController(
     private var hasConfirmedPlayback = false
     private val tuneInProgress = MutableStateFlow(false)
     private var tuneStartedAtMs = 0L
+    private var playbackConfirmedAtMs: Long? = null
+    private var lastVideoUnavailableReason: Int? = null
+    private var trackingTimeShift = false
     private var initialTuneRetried = false
     private var weakSignalDuringTune = false
 
@@ -115,10 +118,12 @@ class TunerPlayerController(
 
     private val timeShiftCallback = object : TvView.TimeShiftPositionCallback() {
         override fun onTimeShiftCurrentPositionChanged(inputId: String?, timeMs: Long) {
+            if (!trackingTimeShift) return
             _timeShiftState.value = _timeShiftState.value.copy(currentPositionMs = timeMs)
         }
 
         override fun onTimeShiftStartPositionChanged(inputId: String?, timeMs: Long) {
+            if (!trackingTimeShift) return
             _timeShiftState.value = _timeShiftState.value.copy(startPositionMs = timeMs)
         }
     }
@@ -157,6 +162,11 @@ class TunerPlayerController(
 
         override fun onVideoUnavailable(inputId: String?, reason: Int) {
             val ch = currentChannel?.takeIf { it.inputId == inputId } ?: return
+            if (lastVideoUnavailableReason != reason) {
+                lastVideoUnavailableReason = reason
+                val elapsed = SystemClock.elapsedRealtime() - tuneStartedAtMs
+                SafeLog.d(TAG, "Video unavailable: channel=${ch.id}, reason=$reason, sinceTuneMs=$elapsed")
+            }
             when (reason) {
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING,
                 TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING,
@@ -212,10 +222,13 @@ class TunerPlayerController(
 
     private fun confirmPlaying() {
         val ch = currentChannel ?: return
+        lastVideoUnavailableReason = null
         tuneInProgress.value = false
         hasConfirmedPlayback = true
         if (confirmedChannelId != ch.id) {
-            val elapsed = SystemClock.elapsedRealtime() - tuneStartedAtMs
+            val now = SystemClock.elapsedRealtime()
+            playbackConfirmedAtMs = now
+            val elapsed = now - tuneStartedAtMs
             SafeLog.i(TAG, "Tune video available: channel=${ch.id}, elapsedMs=$elapsed")
         }
         confirmedChannelId = ch.id
@@ -232,7 +245,17 @@ class TunerPlayerController(
         tvView = view
         runCatching { view.setCallback(sessionCallback) }
             .onFailure { SafeLog.w(TAG, "setCallback", it) }
-        runCatching { view.setTimeShiftPositionCallback(timeShiftCallback) }
+        updateTimeShiftPositionCallback()
+    }
+
+    fun setTimeShiftPositionTracking(enabled: Boolean) {
+        if (trackingTimeShift == enabled) return
+        trackingTimeShift = enabled
+        updateTimeShiftPositionCallback()
+    }
+
+    private fun updateTimeShiftPositionCallback() {
+        runCatching { tvView?.setTimeShiftPositionCallback(timeShiftCallback.takeIf { trackingTimeShift }) }
             .onFailure { SafeLog.w(TAG, "setTimeShiftPositionCallback", it) }
     }
 
@@ -247,6 +270,7 @@ class TunerPlayerController(
         tvView = null
         currentChannel = null
         confirmedChannelId = null
+        playbackConfirmedAtMs = null
         hasConfirmedPlayback = false
         tuneInProgress.value = false
         _trackState.value = TrackState()
@@ -255,18 +279,24 @@ class TunerPlayerController(
     }
 
     /** Kanali ayarlar. Tekrar denemeler [waitForConfirmation] tarafindan yonetilir. */
-    fun tune(channel: Channel) {
+    fun tune(channel: Channel, requestedAtMs: Long) {
         val view = tvView
         if (view == null) {
             onState(PlaybackState.Error(channel, str(R.string.err_player_not_ready)))
             return
         }
         if (currentChannel == channel && (confirmedChannelId == channel.id || tuneInProgress.value)) return
-        if (currentChannel?.inputId != channel.inputId) hasConfirmedPlayback = false
+        val inputChanged = currentChannel?.inputId != channel.inputId
+        if (inputChanged) hasConfirmedPlayback = false
         currentChannel = channel
         _signalStrength.value = null
         confirmedChannelId = null
         tuneStartedAtMs = SystemClock.elapsedRealtime()
+        val previousWatchMs = playbackConfirmedAtMs?.let { tuneStartedAtMs - it }
+        playbackConfirmedAtMs = null
+        lastVideoUnavailableReason = null
+        _timeShiftState.value = TimeShiftState(available = !inputChanged && _timeShiftState.value.available)
+        SafeLog.i(TAG, "Tune sent: channel=${channel.id}, appWaitMs=${tuneStartedAtMs - requestedAtMs}, previousWatchMs=$previousWatchMs")
         initialTuneRetried = false
         weakSignalDuringTune = false
         tuneInProgress.value = true
@@ -315,6 +345,7 @@ class TunerPlayerController(
         runCatching { tvView?.reset() }.onFailure { SafeLog.w(TAG, "reset", it) }
         currentChannel = null
         confirmedChannelId = null
+        playbackConfirmedAtMs = null
         hasConfirmedPlayback = false
         tuneInProgress.value = false
         _trackState.value = TrackState()
@@ -546,10 +577,11 @@ fun TunerTvView(
                 Lifecycle.Event.ON_START -> if (stopped) {
                     stopped = false
                     scope.launch {
+                        val requestedAtMs = SystemClock.elapsedRealtime()
                         val target = latestChannel ?: return@launch
                         val view = controller.tvView ?: return@launch
                         view.awaitAttachedToWindow()
-                        controller.tune(target)
+                        controller.tune(target, requestedAtMs)
                         controller.waitForConfirmation(target)
                     }
                 }
@@ -589,6 +621,7 @@ fun TunerTvView(
     }
 
     LaunchedEffect(channel?.id, channel?.inputId) {
+        val requestedAtMs = SystemClock.elapsedRealtime()
         val target = channel ?: run {
             controller.stop()
             return@LaunchedEffect
@@ -601,7 +634,7 @@ fun TunerTvView(
         // request in flight and let newer selections replace the pending one.
         controller.awaitTuneSlot(target)
         if (!currentCoroutineContext().isActive) return@LaunchedEffect
-        controller.tune(target)
+        controller.tune(target, requestedAtMs)
         controller.waitForConfirmation(target)
     }
 }

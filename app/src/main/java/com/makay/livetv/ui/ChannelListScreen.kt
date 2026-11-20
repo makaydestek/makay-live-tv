@@ -1,8 +1,10 @@
 package com.makay.livetv.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -25,12 +27,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.pluralStringResource
@@ -51,9 +54,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import com.makay.livetv.R
 import com.makay.livetv.domain.model.Channel
 import com.makay.livetv.domain.model.ChannelFilter
@@ -72,6 +72,7 @@ import com.makay.livetv.util.TimeFormat
 @Composable
 fun ChannelListScreen(
     channels: List<Channel>,
+    editing: Boolean,
     activeChannelId: Long?,
     epg: Map<Long, ChannelEpg>,
     showLogos: Boolean,
@@ -82,6 +83,7 @@ fun ChannelListScreen(
     onSetDeleted: (Channel, Boolean) -> Unit,
     onSetSkipped: (Channel, Boolean) -> Unit,
     onMoveChannel: (Channel, Int) -> Unit,
+    onBeginMove: () -> Unit,
     onSetLocked: (Channel, Boolean) -> Boolean,
     onVerifyPin: (String) -> Boolean,
     onSelect: (Channel) -> Unit,
@@ -100,27 +102,33 @@ fun ChannelListScreen(
 ) {
     val listState = rememberLazyListState()
     val quickActionsFocus = remember { FocusRequester() }
-    val channelFocusRequesters = remember(channels) {
-        channels.associate { it.id to FocusRequester() }
+    val channelIds = channels.map { it.id }.toSet()
+    val channelFocusRequesters = remember(channelIds) {
+        channelIds.associateWith { FocusRequester() }
     }
     var returnToChannelRequest by remember { mutableIntStateOf(0) }
     var panelActivity by remember { mutableIntStateOf(0) }
+    var movingChannelId by remember(editing) { mutableStateOf<Long?>(null) }
+    var dialogChannelId by remember { mutableStateOf<Long?>(null) }
+    BackHandler(enabled = movingChannelId != null) { movingChannelId = null }
     // Kanal paneli ve bilgi bandi benzer bir sure sonra kapanir. Kullanici
     // gezinirken her odak hareketi sayaci yeniler; hareketsizlikte yayin
     // goruntusune kendiliginden donulur.
-    LaunchedEffect(panelActivity, activeChannelId) {
+    LaunchedEffect(panelActivity, activeChannelId, editing, movingChannelId, dialogChannelId, autoHideTimeoutMs) {
+        if (editing || movingChannelId != null || dialogChannelId != null) return@LaunchedEffect
         kotlinx.coroutines.delay(autoHideTimeoutMs)
         onDismiss()
     }
     val activeIndex = remember(channels, activeChannelId) {
         channels.indexOfFirst { it.id == activeChannelId }
     }
-    LaunchedEffect(returnToChannelRequest) {
-        if (returnToChannelRequest > 0 && channels.isNotEmpty()) {
+    LaunchedEffect(returnToChannelRequest, channels.isEmpty(), editing) {
+        if (channels.isNotEmpty()) {
             val targetIndex = activeIndex.takeIf { it >= 0 } ?: 0
             listState.scrollToItem(targetIndex)
             val targetId = channels[targetIndex].id
-            channelFocusRequesters[targetId]?.requestFocus()
+            withFrameNanos { }
+            channelFocusRequesters[targetId]?.requestFocusSafely()
         }
     }
     val returnToChannelList = {
@@ -135,14 +143,19 @@ fun ChannelListScreen(
         Unit
     }
 
-    // Acilista aktif kanali gorunur alana getir ve o satiri odakla.
-    LaunchedEffect(activeIndex, channels.size) {
-        if (activeIndex >= 0) listState.scrollToItem(activeIndex.coerceAtLeast(0))
-    }
-
-    // Liste ilk kez doldugunda aktif (veya ilk) satir odagi alir.
-    val focusOnIndex = remember(activeIndex, channels.size) {
-        if (channels.isEmpty()) -1 else activeIndex.takeIf { it >= 0 } ?: 0
+    LaunchedEffect(movingChannelId, channels) {
+        val id = movingChannelId ?: return@LaunchedEffect
+        val index = channels.indexOfFirst { it.id == id }
+        if (index < 0) {
+            movingChannelId = null
+        } else {
+            withFrameNanos { }
+            if (listState.layoutInfo.visibleItemsInfo.none { it.key == id }) {
+                listState.scrollToItem(index)
+                withFrameNanos { }
+            }
+            channelFocusRequesters[id]?.requestFocusSafely()
+        }
     }
 
     Box(
@@ -161,7 +174,7 @@ fun ChannelListScreen(
         // ---- Baslik ----
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = stringResource(R.string.channels),
+                text = stringResource(if (editing) R.string.menu_channel_edit else R.string.channels),
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -197,7 +210,11 @@ fun ChannelListScreen(
             )
         }
         Text(
-            text = stringResource(R.string.channel_quick_access_hint),
+            text = stringResource(when {
+                movingChannelId != null -> R.string.channel_move_mode_hint
+                editing -> R.string.channel_edit_keys_hint
+                else -> R.string.channel_quick_access_hint
+            }),
             color = Color(0xFF9AAFC6),
             fontSize = 10.sp,
             modifier = Modifier.padding(top = 3.dp, start = 4.dp),
@@ -220,17 +237,24 @@ fun ChannelListScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                itemsIndexed(channels, key = { _, ch -> ch.id }) { index, channel ->
+                items(channels, key = { it.id }) { channel ->
                     ChannelRow(
                         channel = channel,
                         epg = epg[channel.id],
                         isActive = channel.id == activeChannelId,
                         showLogo = showLogos,
-                        requestInitialFocus = index == focusOnIndex,
+                        editing = editing,
+                        moving = movingChannelId == channel.id,
                         focusRequester = channelFocusRequesters.getValue(channel.id),
                         compact = true,
                         onClick = { onSelect(channel) },
                         onFocused = { panelActivity++; onPanelActivity(); onFocused(channel) },
+                        onStartMoving = { movingChannelId = channel.id; onBeginMove() },
+                        onFinishMoving = { movingChannelId = null },
+                        onDialogVisibilityChanged = { visible ->
+                            if (visible) dialogChannelId = channel.id
+                            else if (dialogChannelId == channel.id) dialogChannelId = null
+                        },
                         onNavigateToActions = openQuickActions,
                         onNavigateToMenu = onOpenMainMenu,
                         onLongClickFavorite = { onToggleFavorite(channel) },
@@ -255,11 +279,15 @@ private fun ChannelRow(
     epg: ChannelEpg?,
     isActive: Boolean,
     showLogo: Boolean,
-    requestInitialFocus: Boolean,
+    editing: Boolean,
+    moving: Boolean,
     focusRequester: FocusRequester,
     compact: Boolean = false,
     onClick: () -> Unit,
     onFocused: () -> Unit,
+    onStartMoving: () -> Unit,
+    onFinishMoving: () -> Unit,
+    onDialogVisibilityChanged: (Boolean) -> Unit,
     onNavigateToActions: () -> Unit,
     onNavigateToMenu: () -> Unit,
     onLongClickFavorite: () -> Unit,
@@ -282,10 +310,28 @@ private fun ChannelRow(
     var pinFailed by remember(channel.id) { mutableStateOf(false) }
     var pinUnlockChannel by remember(channel.id) { mutableStateOf(false) }
     var pinRequiredForLock by remember(channel.id) { mutableStateOf(false) }
+    val okPress = remember(channel.id) { RemoteOkPress() }
+    val openActions = { pinRequiredForLock = false; showActions = true }
+    val click = {
+        when {
+            moving -> onFinishMoving()
+            editing -> openActions()
+            channel.isLocallyLocked -> { pinUnlockChannel = false; showUnlock = true }
+            else -> onClick()
+        }
+    }
+    val longClick = {
+        if (editing && !moving) onStartMoving()
+        else if (!moving) openActions()
+    }
+    val dialogOpen = showActions || showRename || showUnlock
+    DisposableEffect(dialogOpen) {
+        if (dialogOpen) onDialogVisibilityChanged(true)
+        onDispose { if (dialogOpen) onDialogVisibilityChanged(false) }
+    }
     val borderColor = if (focused) MakayPrimary else if (isActive) Color(0x663F8CFF) else Color.Transparent
 
     // Acilista aktif kanal satiri odagi alir; DPAD ile gezinme buradan baslar.
-    AutoFocus(focusRequester = focusRequester, shouldRequest = requestInitialFocus, key = channel.id)
 
     Row(
         modifier = Modifier
@@ -299,13 +345,30 @@ private fun ChannelRow(
                     else -> Color(0x6614171D)
                 },
             )
-            .border(if (compact) 1.dp else 2.dp, if (compact && (focused || isActive)) Color(0xBBFFFFFF) else borderColor, RoundedCornerShape(if (compact) 8.dp else 12.dp))
+            .border(
+                if (moving || !compact) 2.dp else 1.dp,
+                if (moving) MakayPrimary else if (compact && (focused || isActive)) Color(0xBBFFFFFF) else borderColor,
+                RoundedCornerShape(if (compact) 8.dp else 12.dp),
+            )
             .focusRequester(focusRequester)
             .onFocusChanged {
                 focused = it.isFocused
+                if (!it.isFocused) okPress.reset()
                 if (it.isFocused && !channel.isLocallyLocked) onFocused()
             }
             .onPreviewKeyEvent { event ->
+                if (okPress.handle(event.nativeKeyEvent, click, longClick)) return@onPreviewKeyEvent true
+                if (moving) {
+                    when (event.key) {
+                        Key.DirectionUp, Key.DirectionDown -> {
+                            if (event.type == KeyEventType.KeyDown) {
+                                onMoveChannel(channel, if (event.key == Key.DirectionUp) -1 else 1)
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        Key.DirectionLeft, Key.DirectionRight -> return@onPreviewKeyEvent true
+                    }
+                }
                 if (event.type != KeyEventType.KeyDown || event.nativeKeyEvent.repeatCount != 0) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionLeft -> { onNavigateToMenu(); true }
@@ -315,8 +378,8 @@ private fun ChannelRow(
             }
             .tvClickable(
                 interaction,
-                onClick = { if (channel.isLocallyLocked) { pinUnlockChannel = false; showUnlock = true } else onClick() },
-                onLongClick = { pinRequiredForLock = false; showActions = true },
+                onClick = click,
+                onLongClick = longClick,
             )
             .padding(horizontal = if (compact) 8.dp else 16.dp, vertical = if (compact) 6.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -421,7 +484,9 @@ private fun ChannelRow(
             }
         }
 
-        if (isActive) {
+        if (moving) {
+            Text(text = "↕", color = MakayPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        } else if (isActive && !compact) {
             Text(
                 text = stringResource(R.string.live_badge),
                 color = MakayPrimary,
@@ -432,14 +497,16 @@ private fun ChannelRow(
     }
 
     if (showActions) {
+        val firstAction = remember { FocusRequester() }
         AlertDialog(
             onDismissRequest = { showActions = false },
             title = { Text(channel.displayName) },
-            text = { Text(stringResource(if (pinRequiredForLock) R.string.parental_pin_required else R.string.channel_actions_hint)) },
-            confirmButton = {
-                Column {
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (pinRequiredForLock) Text(stringResource(R.string.parental_pin_required))
+                    AutoFocus(firstAction, shouldRequest = true)
                     Row {
-                        TextButton(onClick = {
+                        TextButton(modifier = Modifier.focusRequester(firstAction), onClick = {
                             onLongClickFavorite()
                             showActions = false
                         }) { Text(stringResource(if (channel.isFavorite) R.string.channel_remove_favorite else R.string.channel_add_favorite)) }
@@ -453,11 +520,8 @@ private fun ChannelRow(
                             onSetHidden(channel, !channel.isLocallyHidden)
                             showActions = false
                         }) { Text(stringResource(if (channel.isLocallyHidden) R.string.channel_unhide else R.string.channel_hide)) }
-                        TextButton(onClick = { onMoveChannel(channel, -1); showActions = false }) {
-                            Text(stringResource(R.string.channel_move_up))
-                        }
-                        TextButton(onClick = { onMoveChannel(channel, 1); showActions = false }) {
-                            Text(stringResource(R.string.channel_move_down))
+                        TextButton(onClick = { onStartMoving(); showActions = false }) {
+                            Text(stringResource(R.string.channel_move_start))
                         }
                     }
                     Row {
@@ -498,7 +562,7 @@ private fun ChannelRow(
                     }
                 }
             },
-            dismissButton = {
+            confirmButton = {
                 TextButton(onClick = { showActions = false }) {
                     Text(stringResource(R.string.epg_close))
                 }
@@ -520,7 +584,8 @@ private fun ChannelRow(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    onRename(channel, customName.trim().takeIf { it.isNotEmpty() && it != channel.displayName })
+                    val name = customName.trim()
+                    if (name != channel.displayName) onRename(channel, name.ifEmpty { null })
                     showRename = false
                 }) { Text(stringResource(R.string.action_save)) }
             },

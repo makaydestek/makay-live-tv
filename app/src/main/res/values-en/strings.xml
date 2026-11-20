@@ -86,6 +86,9 @@
     <string name="signal_quality_label">Quality</string>
     <string name="signal_quality_unavailable">Not provided by tuner</string>
     <string name="channel_quick_access_hint">Right: filter/sort · Down: return to channels</string>
+    <string name="channel_edit_keys_hint">OK: channel actions · Hold OK: move</string>
+    <string name="channel_move_mode_hint">Up/Down: move · OK/Back: finish</string>
+    <string name="channel_move_start">Move channel</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>

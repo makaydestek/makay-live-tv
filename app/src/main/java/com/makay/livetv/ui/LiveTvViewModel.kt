@@ -38,6 +38,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -122,6 +124,7 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
     private var epgJob: Job? = null
     private var observeJob: Job? = null
     private var recentChannelJob: Job? = null
+    private val channelMoveMutex = Mutex()
 
     init {
         observeJob = viewModelScope.launch {
@@ -134,6 +137,9 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 initialSnapshotReceived = true
                 val decorated = parentalStore.applyTo(prefs.applyTo(initial))
+                if (_allChannels.value.isEmpty() && decorated.any { it.sortPosition != Int.MAX_VALUE }) {
+                    _sort.value = ChannelSort.CUSTOM
+                }
                 _allChannels.value = decorated
                 refreshAvailability()
                 restoreSelectionIfNeeded(decorated)
@@ -352,14 +358,27 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         true
     }.onFailure { SafeLog.w(TAG, "Kanal tercihleri yedeği yüklenemedi", it) }.getOrDefault(false)
 
+    fun prepareChannelEditing() {
+        _sort.value = ChannelSort.CUSTOM
+    }
+
     fun moveChannel(channel: Channel, delta: Int) {
+        val filter = _filter.value
+        val query = _query.value
         viewModelScope.launch {
-            runCatching {
-                prefs.move(channel, delta, _allChannels.value)
-                agentReload()
-                _sort.value = ChannelSort.CUSTOM
-                _filter.value = ChannelFilter.ALL
-            }.onFailure { SafeLog.w(TAG, "moveChannel", it) }
+            channelMoveMutex.withLock {
+                val all = _allChannels.value
+                val visible = filterChannels(all, filter, ChannelSort.CUSTOM, query)
+                val from = visible.indexOfFirst { it.id == channel.id }
+                if (from < 0) return@withLock
+                val neighbor = visible.getOrNull(from + delta) ?: return@withLock
+                runCatching {
+                    val order = prefs.move(channel, neighbor, delta, all)
+                    _allChannels.value = _allChannels.value.map {
+                        it.copy(sortPosition = order[ChannelPreferences.favoriteKeyOf(it)] ?: Int.MAX_VALUE)
+                    }
+                }.onFailure { SafeLog.w(TAG, "moveChannel", it) }
+            }
         }
     }
 
@@ -376,6 +395,8 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun agentReload() {
         val fresh = parentalStore.applyTo(prefs.applyTo(channelsRepo.loadChannels()))
         _allChannels.value = fresh
+        val activeId = _activeChannel.value?.id
+        fresh.firstOrNull { it.id == activeId }?.let { _activeChannel.value = it }
     }
 
     fun hasParentalPin(): Boolean = parentalStore.hasPin

@@ -81,6 +81,7 @@ fun LiveTvScreen(
     numberBuffer: String,
     isRecording: Boolean,
     focusToken: Int,
+    liveRemoteEnabled: Boolean,
     aspectMode: AspectMode,
     onControllerReady: (TunerPlayerController) -> Unit,
     onState: (PlaybackState) -> Unit,
@@ -100,8 +101,8 @@ fun LiveTvScreen(
 
     // Odak istegi: ilk acilista ve her bindirme kapandiktan sonra tekrarlanir
     // (bindirme ekrani odagi kendi uzerine aldigindan canli TV'ye geri donulur).
-    LaunchedEffect(focusToken, activeChannel?.id) {
-        runCatching { rootFocus.requestFocus() }
+    LaunchedEffect(focusToken, activeChannel?.id, liveRemoteEnabled) {
+        if (liveRemoteEnabled) rootFocus.requestFocusSafely()
     }
 
     Box(
@@ -113,6 +114,7 @@ fun LiveTvScreen(
             // ulasmayan D-pad tuslari olabiliyor. Kanal tuslarini odakli alt
             // gorunumlerden once yakala.
             .onPreviewKeyEvent { event ->
+                if (!liveRemoteEnabled) return@onPreviewKeyEvent false
                 handleKey(
                     event = event,
                     onZap = onZap,

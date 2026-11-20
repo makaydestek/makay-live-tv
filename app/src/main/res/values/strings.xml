@@ -92,6 +92,9 @@
     <string name="signal_quality_label">Kalite</string>
     <string name="signal_quality_unavailable">Tuner ölçüm sunmuyor</string>
     <string name="channel_quick_access_hint">Sağ: filtre/sıralama · Aşağı: kanallara dön</string>
+    <string name="channel_edit_keys_hint">OK: kanal işlemleri · OK basılı: taşı</string>
+    <string name="channel_move_mode_hint">Yukarı/Aşağı: taşı · OK/Geri: bitir</string>
+    <string name="channel_move_start">Kanalı taşı</string>
     <string name="settings_theme">Tema</string>
     <string name="settings_theme_dark">Koyu</string>
     <string name="settings_theme_light">Açık</string>

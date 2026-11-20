@@ -4,6 +4,7 @@ import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +45,7 @@ import com.makay.livetv.player.TunerPlayerController
 import com.makay.livetv.timer.TimerEvent
 import com.makay.livetv.timer.TimerEventBus
 import com.makay.livetv.update.AppUpdateViewModel
+import com.makay.livetv.util.SafeLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -205,16 +207,27 @@ fun AppRoot(
         bannerToken++
     }
 
+    val liveOkPress = remember { RemoteOkPress() }
+
     // Handle DPAD and numeric keys before they reach the secure TV surface.
     // Several Homatics remotes stop delivering those keys to Compose after
     // playback has been running for a while.
     SideEffect {
-        val screen = navigator.current
-        val enabled = screen == AppScreen.LiveTv || screen == AppScreen.ChannelList
+        val enabled = navigator.current == AppScreen.LiveTv
         (context as? com.makay.livetv.MainActivity)?.setLiveTvRemoteHandler(
             if (!enabled) null else { event ->
                 val isDown = event.action == android.view.KeyEvent.ACTION_DOWN
-                if (screen == AppScreen.ChannelList && event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (liveOkPress.handle(
+                        event,
+                        onClick = {
+                            revealChannelInfo()
+                            if (!viewModel.commitNumberEntry()) openGuarded(AppScreen.ChannelList)
+                        },
+                        onLongClick = ::revealChannelInfo,
+                    )
+                ) {
+                    true
+                } else if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
                     if (isDown && event.repeatCount == 0) navigator.navigate(AppScreen.MainMenu)
                     true
                 } else {
@@ -225,8 +238,10 @@ fun AppRoot(
                         android.view.KeyEvent.KEYCODE_CHANNEL_DOWN -> -1
                         else -> null
                     }
-                    if (channelDelta != null && screen == AppScreen.LiveTv) {
+                    if (channelDelta != null) {
                         if (isDown && event.repeatCount == 0) {
+                            val deliveryMs = SystemClock.uptimeMillis() - event.eventTime
+                            SafeLog.d("TunerPlayer", "Channel key: delta=$channelDelta, deliveryMs=$deliveryMs")
                             viewModel.cancelNumberEntry()
                             viewModel.zap(channelDelta)
                             revealChannelInfo()
@@ -234,7 +249,7 @@ fun AppRoot(
                         true
                     } else {
                         val digit = event.keyCode.toChannelDigit()
-                        if (digit != null && screen == AppScreen.LiveTv) {
+                        if (digit != null) {
                             if (isDown && event.repeatCount == 0) viewModel.inputDigit(digit)
                             true
                         } else false
@@ -287,7 +302,14 @@ fun AppRoot(
             override suspend fun emit(value: TrackState) { trackState = value }
         })
     }
-    LaunchedEffect(controller) {
+    val timeShiftOptionsVisible = navigator.current == AppScreen.Options
+    DisposableEffect(controller, timeShiftOptionsVisible) {
+        val ready = controller
+        if (timeShiftOptionsVisible) ready?.setTimeShiftPositionTracking(true)
+        onDispose { if (timeShiftOptionsVisible) ready?.setTimeShiftPositionTracking(false) }
+    }
+    LaunchedEffect(controller, timeShiftOptionsVisible) {
+        if (!timeShiftOptionsVisible) return@LaunchedEffect
         val ready = controller ?: return@LaunchedEffect
         ready.timeShiftState.collect(object : kotlinx.coroutines.flow.FlowCollector<TimeShiftState> {
             override suspend fun emit(value: TimeShiftState) { timeShiftState = value }
@@ -299,13 +321,18 @@ fun AppRoot(
     // panel ozelidir: panel kapandiginda temizlenir ki sonraki acilista
     // filtrelenmis/kaybolmus liste surprizi olmasin.
     var focusEpoch by remember { mutableIntStateOf(0) }
-    LaunchedEffect(navigator.depth) {
+    LaunchedEffect(navigator.current) {
+        liveOkPress.reset()
         if (navigator.current == AppScreen.LiveTv) {
             focusEpoch++
         } else {
             viewModel.cancelNumberEntry()
         }
-        if (navigator.current != AppScreen.ChannelList) viewModel.setQuery("")
+        when (navigator.current) {
+            AppScreen.ChannelEditor -> viewModel.prepareChannelEditing()
+            AppScreen.ChannelList -> Unit
+            else -> viewModel.setQuery("")
+        }
     }
 
     // Kanal degisince ust ve alt bilgi birlikte gosterilir; sabit zamanlayici
@@ -326,7 +353,7 @@ fun AppRoot(
     LaunchedEffect(bannerToken, bannerVisible, bannerTimeout) {
         if (!bannerVisible) return@LaunchedEffect
         val token = bannerToken
-        delay(bannerTimeout.coerceAtMost(2_800L))
+        delay(bannerTimeout)
         if (bannerToken == token) bannerVisible = false
     }
 
@@ -366,6 +393,7 @@ fun AppRoot(
             numberBuffer = numberBuffer,
             isRecording = isRecording,
             focusToken = focusEpoch,
+            liveRemoteEnabled = navigator.current == AppScreen.LiveTv,
             aspectMode = aspectMode,
             onControllerReady = { controller = it },
             onState = { playbackState = it },
@@ -431,8 +459,9 @@ fun AppRoot(
             },
         )
 
-        AppScreen.ChannelList -> ChannelListScreen(
+        AppScreen.ChannelList, AppScreen.ChannelEditor -> ChannelListScreen(
             channels = allChannels,
+            editing = navigator.current == AppScreen.ChannelEditor,
             activeChannelId = activeChannel?.id,
             epg = epgMap,
             showLogos = showLogos,
@@ -443,6 +472,7 @@ fun AppRoot(
             onSetDeleted = viewModel::setChannelDeleted,
             onSetSkipped = viewModel::setChannelSkipped,
             onMoveChannel = viewModel::moveChannel,
+            onBeginMove = viewModel::prepareChannelEditing,
             onSetLocked = viewModel::setChannelLocked,
             onVerifyPin = viewModel::verifyParentalPin,
             onSelect = { channel ->
@@ -461,7 +491,7 @@ fun AppRoot(
             onQueryChange = viewModel::setQuery,
             onOpenMainMenu = { navigator.navigate(AppScreen.MainMenu) },
             onDismiss = { navigator.popTo(AppScreen.LiveTv) },
-            autoHideTimeoutMs = bannerTimeout.coerceAtMost(2_800L),
+            autoHideTimeoutMs = bannerTimeout,
             onPanelActivity = ::revealChannelInfo,
         )
 
@@ -797,6 +827,7 @@ private data class TimerRequest(
 /** Menu kilidi acikken PIN istenen ekranlar (EPG ve canli TV disarida). */
 private val MENU_LOCKED_SCREENS = setOf(
     AppScreen.ChannelList,
+    AppScreen.ChannelEditor,
     AppScreen.Settings,
     AppScreen.Timers,
     AppScreen.Recordings,

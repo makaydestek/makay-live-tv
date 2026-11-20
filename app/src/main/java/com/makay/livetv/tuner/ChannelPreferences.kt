@@ -198,23 +198,22 @@ class ChannelPreferences private constructor(context: Context) {
     }
 
     /** Uygulama ici kanal sirasinda bir kanali komsu satira tasir. */
-    suspend fun move(channel: Channel, delta: Int, channels: List<Channel>) {
-        if (delta == 0 || channels.size < 2) return
-        store.edit { prefs ->
+    suspend fun move(channel: Channel, neighbor: Channel, delta: Int, channels: List<Channel>): Map<String, Int> {
+        val updated = store.edit { prefs ->
             val keys = channels.sortedWith(compareBy({ it.sortKey }, { it.displayName }))
                 .map(::favoriteKeyOf)
                 .distinct()
-                .toMutableList()
             val saved = prefs[KEY_ORDER].orEmpty().split('\n').filter { it in keys }
             val ordered = (saved + keys.filterNot { it in saved }).toMutableList()
-            val from = ordered.indexOf(favoriteKeyOf(channel))
-            val to = (from + delta).coerceIn(0, ordered.lastIndex)
-            if (from >= 0 && from != to) {
-                val item = ordered.removeAt(from)
-                ordered.add(to, item)
-                prefs[KEY_ORDER] = ordered.joinToString("\n")
-            }
+            val key = favoriteKeyOf(channel)
+            val anchor = favoriteKeyOf(neighbor)
+            if (key == anchor || anchor !in ordered || !ordered.remove(key)) return@edit
+            val target = ordered.indexOf(anchor) + if (delta > 0) 1 else 0
+            ordered.add(target, key)
+            prefs[KEY_ORDER] = ordered.joinToString("\n")
         }
+        return updated[KEY_ORDER].orEmpty().lineSequence().filter(String::isNotBlank)
+            .withIndex().associate { (index, key) -> key to index }
     }
 
     suspend fun markWatched(channel: Channel, limit: Int = RECENT_LIMIT) {
