@@ -455,6 +455,9 @@ private fun InfoBanner(
                     color = MakayPrimary,
                     trackColor = Color(0x33FFFFFF),
                 )
+            } ?: run {
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.epg_no_data), color = Color(0xFFADB8C7), fontSize = 14.sp)
             }
             epg?.next?.let { next ->
                 Spacer(Modifier.height(4.dp))
@@ -474,6 +477,9 @@ private fun InfoBanner(
                         fontSize = 11.sp,
                     )
                 }
+            } ?: run {
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.epg_next_program, "—"), color = Color(0xFF8FA6C8), fontSize = 12.sp)
             }
             val strength = vendorSignal?.strengthPercent
             val quality = vendorSignal?.qualityPercent
@@ -481,26 +487,21 @@ private fun InfoBanner(
                 TvInputManager.SIGNAL_STRENGTH_STRONG -> stringResource(R.string.signal_level_strong)
                 TvInputManager.SIGNAL_STRENGTH_WEAK -> stringResource(R.string.signal_level_weak)
                 TvInputManager.SIGNAL_STRENGTH_LOST -> stringResource(R.string.signal_level_lost)
-                else -> null
+                else -> stringResource(R.string.signal_measurement_unavailable)
             }
-            if (strength != null || quality != null || signalLabel != null) {
-                Spacer(Modifier.height(7.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    if (strength != null || signalLabel != null) {
-                        SignalMetric(
-                            label = stringResource(R.string.signal_label),
-                            value = if (strength != null) stringResource(R.string.signal_percent, strength) else signalLabel.orEmpty(),
-                            strength = signalStrength,
-                        )
-                    }
-                    if (quality != null) {
-                        SignalMetric(
-                            label = stringResource(R.string.signal_quality_label),
-                            value = stringResource(R.string.signal_percent, quality),
-                            strength = null,
-                        )
-                    }
-                }
+            Spacer(Modifier.height(7.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                SignalMetric(
+                    label = stringResource(R.string.signal_label),
+                    value = if (strength != null) stringResource(R.string.signal_percent, strength) else signalLabel,
+                    strength = signalStrength,
+                )
+                SignalMetric(
+                    label = stringResource(R.string.signal_quality_label),
+                    value = if (quality != null) stringResource(R.string.signal_percent, quality)
+                    else stringResource(R.string.signal_measurement_unavailable),
+                    strength = null,
+                )
             }
         }
     }
