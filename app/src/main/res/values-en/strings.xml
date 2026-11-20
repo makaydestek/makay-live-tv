@@ -84,6 +84,7 @@
     <string name="signal_level_unknown">Unknown</string>
     <string name="signal_label">Signal</string>
     <string name="signal_quality_label">Quality</string>
+    <string name="signal_percent">%1$d%%</string>
     <string name="signal_quality_unavailable">Not provided by tuner</string>
     <string name="channel_quick_access_hint">Right: filter/sort · Down: return to channels</string>
     <string name="channel_edit_keys_hint">OK: channel actions · Hold OK: move</string>

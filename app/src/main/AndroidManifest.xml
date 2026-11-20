@@ -4,6 +4,7 @@
 
     <queries>
         <package android:name="com.nes.seilivetv" />
+        <provider android:authorities="com.nes.dtvkit.tvsetting" />
     </queries>
 
     <!--
