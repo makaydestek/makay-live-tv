@@ -107,6 +107,12 @@ tarama sihirbazını kendimiz yazmak yerine cihazın kendi DTV girdisini kullanm
 
 ---
 
+### USB ile toplu kanal düzenleme
+
+`Ayarlar > Bakım > USB kanal düzenleme ve yedekleme` ekranından CSV dışa aktarın. Dosyayı USB belleğe kaydedip bilgisayarda tablo uygulamasıyla açın; `order`, `channel_name`, `favorite`, `hidden`, `deleted` ve `skipped` alanlarını düzenleyin. `input_id`, `input_label` ve `channel_number` sütunları kanalları eşleştirmek içindir; değiştirmeyin. Dosyayı CSV olarak kaydedip aynı ekrandaki **Dosyadan yükle** eylemiyle seçin. Değişiklikler uygulamaya hemen uygulanır, uygulama verisini/fabrika ayarlarını sıfırlamak gerekmez. Önceden alınmış JSON yedekleri de içe aktarılabilir.
+
+Bu işlem yalnız Makay Live TV'nin yerel kanal görünümünü ve tercihlerini düzenler. Üretici tuner uygulamasının sistem kanal tablosunu değiştirmek için gereken ayrıcalık üçüncü taraf uygulamalara açık olmadığından, kanal ekleme/silme ve tuner frekansı gibi sistem düzeyi işlemler üretici uygulamasında yapılmalıdır.
+
 ## 2. Mimari
 
 ```

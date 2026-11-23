@@ -89,7 +89,7 @@ fun AppRoot(
         viewModel.refreshChannelsFromProvider()
     }
     val exportBackupLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
+        ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri ->
         if (uri != null) scope.launch {
             backupNotice = context.getString(
@@ -530,8 +530,8 @@ fun AppRoot(
             onUpdateParentalPin = viewModel::updateParentalPin,
             onClearParentalPin = viewModel::clearParentalPin,
             onOpenTunerSettings = { viewModel.openTunerSettings() },
-            onExportChannelBackup = { exportBackupLauncher.launch("MakayLiveTV_channels.json") },
-            onImportChannelBackup = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
+            onExportChannelBackup = { exportBackupLauncher.launch("MakayLiveTV_channels.csv") },
+            onImportChannelBackup = { importBackupLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/json", "text/*")) },
             updateStatus = when {
                 updateState.checking -> context.getString(R.string.update_checking)
                 updateState.downloading -> updateState.statusMessage

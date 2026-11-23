@@ -155,6 +155,127 @@ class ChannelPreferences private constructor(context: Context) {
         return Gson().toJson(backup)
     }
 
+    /** Spreadsheet-friendly channel list. Editing this file changes app-local preferences only. */
+    fun exportEditableCsv(channels: List<Channel>): String = buildString {
+        appendLine("order,input_id,input_label,channel_number,channel_name,favorite,hidden,deleted,skipped")
+        channels.sortedWith(compareBy({ it.sortPosition }, { it.sortKey }, { it.displayName }))
+            .take(MAX_BACKUP_ITEMS)
+            .forEachIndexed { index, channel ->
+                append(index + 1).append(',')
+                append(csvField(channel.inputId)).append(',')
+                append(csvField(channel.inputLabel)).append(',')
+                append(csvField(channel.displayNumber)).append(',')
+                append(csvField(channel.displayName)).append(',')
+                append(if (channel.isFavorite) "1" else "0").append(',')
+                append(if (channel.isLocallyHidden) "1" else "0").append(',')
+                append(if (channel.isLocallyDeleted) "1" else "0").append(',')
+                append(if (channel.isLocallySkipped) "1" else "0").appendLine()
+            }
+    }
+
+    /** Applies an edited CSV to matching tuner channels without touching TvProvider. */
+    suspend fun importEditableCsv(raw: String, channels: List<Channel>): Boolean {
+        if (raw.length > MAX_BACKUP_CHARS) return false
+        val rows = parseCsv(raw) ?: return false
+        if (rows.size < 2 || rows.size > MAX_BACKUP_ITEMS + 1) return false
+        val header = rows.first().map { it.trim().removePrefix("\uFEFF").lowercase() }
+        val required = listOf("order", "input_id", "input_label", "channel_number", "channel_name", "favorite", "hidden", "deleted", "skipped")
+        if (header != required) return false
+
+        data class Edit(val channel: Channel, val order: Int, val name: String?, val favorite: Boolean, val hidden: Boolean, val deleted: Boolean, val skipped: Boolean)
+        val byKey = channels.associateBy(::favoriteKeyOf)
+        val byLabelAndNumber = channels.groupBy { it.inputLabel to it.displayNumber }
+        val edits = mutableListOf<Edit>()
+        val seen = mutableSetOf<String>()
+        for (row in rows.drop(1)) {
+            if (row.all(String::isBlank)) continue
+            if (row.size != required.size) return false
+            val values = required.indices.associate { header[it] to row[it].trim() }
+            val number = values.getValue("channel_number")
+            val inputId = values.getValue("input_id")
+            val channel = byKey["$inputId|$number"]
+                ?: byLabelAndNumber[values.getValue("input_label") to number]?.singleOrNull()
+                ?: continue // Rows for channels not present on this tuner are safely ignored.
+            val key = favoriteKeyOf(channel)
+            if (!seen.add(key)) return false
+            val order = values.getValue("order").toIntOrNull()?.takeIf { it > 0 } ?: return false
+            fun readFlag(name: String): Boolean? = when (values.getValue(name).lowercase()) {
+                "1", "true", "yes", "evet" -> true
+                "0", "false", "no", "hayır", "hayir" -> false
+                else -> null
+            }
+            val favorite = readFlag("favorite") ?: return false
+            val hidden = readFlag("hidden") ?: return false
+            val deleted = readFlag("deleted") ?: return false
+            val skipped = readFlag("skipped") ?: return false
+            val name = values.getValue("channel_name").takeIf(String::isNotBlank)
+            edits += Edit(channel, order, name, favorite, hidden, deleted, skipped)
+        }
+        if (edits.isEmpty() || edits.map { it.order }.distinct().size != edits.size) return false
+
+        store.edit { prefs ->
+            fun currentSet(key: Preferences.Key<Set<String>>) = (prefs[key] ?: emptySet()).toMutableSet()
+            val favorites = currentSet(KEY_FAVORITES)
+            val hidden = currentSet(KEY_HIDDEN)
+            val deleted = currentSet(KEY_DELETED)
+            val skipped = currentSet(KEY_SKIPPED)
+            val renames = (prefs[KEY_RENAMES] ?: "").lineSequence().filter(String::isNotBlank).mapNotNull { line ->
+                val split = line.indexOf('=')
+                if (split <= 0) null else line.substring(0, split) to line.substring(split + 1)
+            }.toMap().toMutableMap()
+
+            edits.forEach { edit ->
+                val key = favoriteKeyOf(edit.channel)
+                if (edit.favorite) favorites.add(key) else favorites.remove(key)
+                if (edit.hidden) hidden.add(key) else hidden.remove(key)
+                if (edit.deleted) deleted.add(key) else deleted.remove(key)
+                if (edit.skipped) skipped.add(key) else skipped.remove(key)
+                if (edit.name == null || edit.name == edit.channel.displayNumber) renames.remove(key)
+                else renames[key] = edit.name.replace('\n', ' ')
+            }
+            val importedOrder = edits.sortedBy { it.order }.map { favoriteKeyOf(it.channel) }
+            val savedOrder = prefs[KEY_ORDER].orEmpty().split('\n').filter(String::isNotBlank)
+            val completeOrder = (importedOrder + savedOrder + channels.map(::favoriteKeyOf)).distinct()
+            prefs[KEY_FAVORITES] = favorites
+            prefs[KEY_HIDDEN] = hidden
+            prefs[KEY_DELETED] = deleted
+            prefs[KEY_SKIPPED] = skipped
+            prefs[KEY_RENAMES] = renames.entries.joinToString("\n") { "${it.key}=${it.value}" }
+            prefs[KEY_ORDER] = completeOrder.joinToString("\n")
+        }
+        return true
+    }
+
+    private fun csvField(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+    /** Small RFC 4180 reader for the flat, fixed-column channel CSV. */
+    private fun parseCsv(raw: String): List<List<String>>? = runCatching {
+        val rows = mutableListOf<List<String>>()
+        var row = mutableListOf<String>()
+        val field = StringBuilder()
+        var quoted = false
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            when {
+                quoted && c == '"' && raw.getOrNull(i + 1) == '"' -> { field.append('"'); i++ }
+                c == '"' && !quoted && field.isEmpty() -> quoted = true
+                c == '"' && quoted -> quoted = false
+                c == ',' && !quoted -> { row += field.toString(); field.setLength(0) }
+                (c == '\r' || c == '\n') && !quoted -> {
+                    row += field.toString(); field.setLength(0)
+                    rows += row; row = mutableListOf()
+                    if (c == '\r' && raw.getOrNull(i + 1) == '\n') i++
+                }
+                else -> field.append(c)
+            }
+            i++
+        }
+        if (quoted) return null
+        if (field.isNotEmpty() || row.isNotEmpty()) { row += field.toString(); rows += row }
+        rows
+    }.getOrNull()
+
     /**
      * Uygulama tercih yedegini dogrulayip tek DataStore yaziminda uygular.
      * DTVKit/TvProvider kanal tablosu degistirilmez.

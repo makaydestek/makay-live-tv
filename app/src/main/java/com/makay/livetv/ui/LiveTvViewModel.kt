@@ -315,10 +315,10 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Kanal kişiselleştirmelerini kullanıcı tarafından seçilen dosyaya yazar. */
     suspend fun exportChannelPreferences(uri: android.net.Uri): Boolean = runCatching {
-        val json = prefs.exportBackup(_allChannels.value)
+        val csv = prefs.exportEditableCsv(_allChannels.value)
         withContext(Dispatchers.IO) {
             getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { output ->
-                output.writer(Charsets.UTF_8).use { it.write(json) }
+                output.writer(Charsets.UTF_8).use { it.write(csv) }
                 true
             } ?: false
         }
@@ -339,7 +339,13 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
                 result.toString()
             }
         } ?: return false
-        if (!prefs.importBackup(json)) return false
+        val imported = if (json.trimStart().startsWith("{")) {
+            prefs.importBackup(json)
+        } else {
+            prefs.importEditableCsv(json, _allChannels.value)
+        }
+        if (!imported) return false
+        _sort.value = ChannelSort.CUSTOM
         agentReload()
         true
     }.onFailure { SafeLog.w(TAG, "Kanal tercihleri yedeği yüklenemedi", it) }.getOrDefault(false)
