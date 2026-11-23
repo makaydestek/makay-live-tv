@@ -106,8 +106,8 @@ fun AppRoot(
             )
         }
     }
-    val launchTunerSetup: () -> Boolean = {
-        val intent = viewModel.tunerSetupIntent()
+    val launchTunerSetup: (Boolean) -> Boolean = { tkgs ->
+        val intent = viewModel.tunerSetupIntent(tkgs)
         if (intent != null) {
             tunerSetupLauncher.launch(intent)
             true
@@ -381,7 +381,8 @@ fun AppRoot(
     when (navigator.current) {
         AppScreen.FirstLaunch -> FirstLaunchScreen(
             availability = availability,
-            onScan = { launchTunerSetup() },
+            onScan = { launchTunerSetup(false) },
+            onTkgsScan = { launchTunerSetup(true) },
             onContinue = {
                 viewModel.completeFirstLaunch()
                 navigator.pop()
@@ -408,7 +409,7 @@ fun AppRoot(
             onOpenMainMenu = { navigator.navigate(AppScreen.MainMenu) },
             onOpenEpg = { navigator.navigate(AppScreen.Epg) },
             onOpenSettings = { openGuarded(AppScreen.Settings) },
-            onOpenTunerSetup = { launchTunerSetup() },
+            onOpenTunerSetup = { launchTunerSetup(false) },
             onOpenOptions = { navigator.navigate(AppScreen.Options) },
             onToggleBanner = {
                 bannerToken++
@@ -436,7 +437,7 @@ fun AppRoot(
     when (navigator.current) {
         AppScreen.MainMenu -> MainMenuScreen(
             recordings = recordings,
-            onOpenSetup = { launchTunerSetup() },
+            onOpenSetup = { launchTunerSetup(false) },
             onEnterPictureInPicture = {
                 navigator.popTo(AppScreen.LiveTv)
                 scope.launch {
@@ -487,7 +488,7 @@ fun AppRoot(
             },
             // Odak sadece listede gezinir; kanal tune işlemi OK/click ile seçilince yapılır.
             onFocused = {},
-            onScanChannels = { launchTunerSetup() },
+            onScanChannels = { launchTunerSetup(false) },
             filter = filter,
             sort = sort,
             query = query,
@@ -530,6 +531,7 @@ fun AppRoot(
             onUpdateParentalPin = viewModel::updateParentalPin,
             onClearParentalPin = viewModel::clearParentalPin,
             onOpenTunerSettings = { viewModel.openTunerSettings() },
+            onStartTkgsScan = { launchTunerSetup(true) },
             onExportChannelBackup = { exportBackupLauncher.launch("MakayLiveTV_channels.csv") },
             onImportChannelBackup = { importBackupLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/json", "text/*")) },
             updateStatus = when {

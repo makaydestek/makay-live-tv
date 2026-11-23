@@ -46,6 +46,7 @@ fun FirstLaunchScreen(
     availability: TunerAvailability,
     onContinue: () -> Unit,
     onScan: () -> Unit,
+    onTkgsScan: () -> Unit,
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -118,6 +119,11 @@ fun FirstLaunchScreen(
                     label = stringResource(R.string.action_scan_channels),
                     onClick = onScan,
                 )
+                Spacer(Modifier.height(10.dp))
+                BigButton(
+                    label = stringResource(R.string.first_launch_tkgs_setup),
+                    onClick = onTkgsScan,
+                )
             }
 
             if (availability !is TunerAvailability.NeedsScan && availability !is TunerAvailability.NotSupported) {
@@ -125,6 +131,11 @@ fun FirstLaunchScreen(
                 BigButton(
                     label = stringResource(R.string.first_launch_open_setup),
                     onClick = onScan,
+                )
+                Spacer(Modifier.height(10.dp))
+                BigButton(
+                    label = stringResource(R.string.first_launch_tkgs_setup),
+                    onClick = onTkgsScan,
                 )
             }
 

@@ -64,6 +64,7 @@ fun SettingsScreen(
     onUpdateParentalPin: (String, String) -> Boolean,
     onClearParentalPin: (String) -> Boolean,
     onOpenTunerSettings: () -> Unit,
+    onStartTkgsScan: () -> Unit,
     onExportChannelBackup: () -> Unit,
     onImportChannelBackup: () -> Unit,
     updateStatus: String?,
@@ -200,6 +201,12 @@ fun SettingsScreen(
             subtitle = stringResource(R.string.settings_tuner_setup_desc),
         ) {
             ActionButton(stringResource(R.string.action_open)) { onOpenTunerSettings() }
+        }
+        SettingRow(
+            title = stringResource(R.string.settings_tkgs_setup),
+            subtitle = stringResource(R.string.settings_tkgs_setup_desc),
+        ) {
+            ActionButton(stringResource(R.string.action_open)) { onStartTkgsScan() }
         }
         SettingRow(
             title = stringResource(R.string.settings_channel_count),

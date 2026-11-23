@@ -47,9 +47,11 @@ Referans uygulamanın kendi oynatma kodu (`NesTvView.tuneChannel`) da tam olarak
 customerTvView.tune(channel.getInputId(), TvContract.buildChannelUri(channel.getId()), bundle);
 ```
 
-Yani **dahili tuner desteği = TIF entegrasyonu**. Biz de aynı yolu izliyoruz; fark,
-tarama sihirbazını kendimiz yazmak yerine cihazın kendi DTV girdisini kullanmamız
-(kanal listesi cihazın DTV uygulamasıyla paylaşılır).
+Yani **dahili tuner desteği = TIF entegrasyonu**. Makay kanal izleme ve kanal
+düzenleme arayüzünü sağlar. Uydu arama işlemleri ise cihazın DTV tarama bileşenini
+kullanır; tarama servisi bu cihazda üçüncü taraf uygulamalara açık değildir.
+Homatics/DTVKit'te ilk kurulum ve Ayarlar içinden manuel tarama veya TKGS araması
+başlatılabilir. Taramanın kendisi üreticinin DTV kurulum ekranında yürütülür.
 
 ### Tespit edilen özellik envanteri (396 string kaynağı)
 
@@ -103,7 +105,7 @@ tarama sihirbazını kendimiz yazmak yerine cihazın kendi DTV girdisini kullanm
 
 \* Kayıt/time-shift ve tuner hata nedenleri cihaz girdisinin yeteneklerine bağlıdır. Depolama göstergesi uygulamanın veri alanını gösterir; DTVKit'in kayıt hedefini temsil ettiği garanti edilmez.
 
-**Cihaz sınırları:** kanal gizleme/sıralama/ad düzenleme Makay Live TV içinde tutulur; üçüncü taraf uygulama, cihazın ortak TvProvider kanal kayıtlarını güvenli biçimde taşıyamaz veya silemez. Uydu, DiSEqC ve TKGS ayarlarını Homatics/DTVKit'in kendi ayar ekranına yönlendiriyoruz. Gerçek kayıt ve time-shift davranışı, bağlı tuner girişinin sunduğu yeteneklere bağlıdır. EPG yaş derecesi okunamayan programlar için yaş filtresi uygulanamaz; sistem düzeyindeki içerik kilidini DTV girdisi yönetir.
+**Cihaz sınırları:** kanal gizleme/sıralama/ad düzenleme Makay Live TV içinde tutulur; üçüncü taraf uygulama, cihazın ortak TvProvider kanal kayıtlarını güvenli biçimde taşıyamaz veya silemez. Uydu, DiSEqC ve TKGS taraması için tuner üreticisinin tarama bileşeni gerekir. Homatics/DTVKit'te Makay, manuel veya TKGS tarama akışını başlatır; tarama ve tuner ayarları üreticinin DTV ekranında uygulanır. Diğer markalar için ayrı tuner entegrasyonu gerekir. Gerçek kayıt ve time-shift davranışı, bağlı tuner girişinin sunduğu yeteneklere bağlıdır. EPG yaş derecesi okunamayan programlar için yaş filtresi uygulanamaz; sistem düzeyindeki içerik kilidini DTV girdisi yönetir.
 
 ---
 

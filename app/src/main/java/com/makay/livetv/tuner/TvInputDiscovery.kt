@@ -70,7 +70,7 @@ class TvInputDiscovery(private val context: Context) {
     }
 
     /** DTV girdisinin kendi kanal kurulum/tarama ekranini acar. */
-    fun createSetupIntent(): Intent? {
+    fun createSetupIntent(tkgs: Boolean = false): Intent? {
         val mgr = manager ?: return null
         val input = discoverInputs().firstOrNull() ?: return null
         // Homatics ships a DTVKit setup component whose generic TIF setup
@@ -78,9 +78,18 @@ class TvInputDiscovery(private val context: Context) {
         // Its licensed SEI Live TV app exposes the supported search flow and
         // internally initializes DTVKit with the selected satellite/LNB data.
         if (input.packageName == DROIDLOGIC_INPUT_PACKAGE && isPackageInstalled("com.nes.seilivetv")) {
-            return Intent("com.nes.intent.action.dvb.search")
+            val intent = Intent("com.nes.intent.action.dvb.search")
                 .setPackage("com.nes.seilivetv")
                 .putExtra("tuner_type", "DVB-S")
+            if (tkgs) {
+                // DTVKit parses this JSON into its native TKGS scan flow.
+                // 0 selects HD preference and the initial/automatic TKGS update mode.
+                intent.putExtra(
+                    "scan_params",
+                    """{"isTkgsScan":true,"tkgsPreferredType":0,"tkgsUpdateType":0}""",
+                )
+            }
+            return intent
         }
         val info = runCatching { mgr.getTvInputInfo(input.id) }.getOrNull() ?: return null
         return runCatching { info.createSetupIntent() }

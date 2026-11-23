@@ -573,7 +573,8 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
     fun completeFirstLaunch() = settings.setFirstLaunchDone(true)
 
     /** Kurulumu Activity Result akisi ile acmak icin gereken uretici intent'i. */
-    fun tunerSetupIntent(): android.content.Intent? = discovery.createSetupIntent()
+    fun tunerSetupIntent(tkgs: Boolean = false): android.content.Intent? =
+        discovery.createSetupIntent(tkgs)
 
     /** Uretici tarama ekranindan donunce TV provider verisini yeniler. */
     fun refreshChannelsFromProvider() {

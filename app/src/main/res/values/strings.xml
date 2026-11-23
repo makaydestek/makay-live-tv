@@ -177,6 +177,7 @@
     <string name="first_launch_setup_steps">İlk kurulum adımları\n1. Kurulum / Kanal tara bölümünü açın.\n2. Uyduyu seçin; LNB ve DiSEqC ayarlarını tesisatınıza göre girin. Ayarları bilmiyorsanız cihazın mevcut tuner ayarlarını kullanın.\n3. Otomatik veya kör taramayı başlatıp kanal taramasının bitmesini bekleyin.\n4. Kaydedip Live TV’ye dönün; bulunan kanallar uygulamada otomatik görünür.\nMenü adları cihaz üreticisine göre değişebilir.</string>
     <string name="first_launch_continue">Başla</string>
     <string name="first_launch_open_setup">Uydu / kanal kurulumunu aç</string>
+    <string name="first_launch_tkgs_setup">TKGS ile kanal kurulumu</string>
     <string name="first_launch_status_tuner">Tuner</string>
     <string name="first_launch_status_channel">Kanal</string>
     <string name="first_launch_status_input">Giriş</string>
@@ -262,6 +263,8 @@
     <string name="parental_pin_required">Önce Ayarlar’dan ebeveyn PIN’i belirleyin.</string>
     <string name="settings_tuner_setup">Tarama ve tuner ayarları</string>
     <string name="settings_tuner_setup_desc">Tarama, uydu/LNB, DiSEqC ve TKGS seçenekleri için cihazın DTV ayarlarını aç</string>
+    <string name="settings_tkgs_setup">TKGS kanal kurulumu</string>
+    <string name="settings_tkgs_setup_desc">TKGS ile kanal kurulumu başlat (DTVKit destekli cihazlar)</string>
     <string name="notif_permission_title">Bildirim izni gerekli</string>
     <string name="notif_permission_body">Zamanlayıcı hatırlatmaları için Android ayarlarında Makay Live TV bildirimlerine izin verin. Zamanlayıcı kurulmadı.</string>
     <string name="channel_backup_title">USB kanal düzenleme ve yedekleme</string>

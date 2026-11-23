@@ -176,6 +176,8 @@
     <string name="parental_pin_required">Set a parental PIN in Settings first.</string>
     <string name="settings_tuner_setup">Scan and tuner settings</string>
     <string name="settings_tuner_setup_desc">Open the device DTV settings for scan, satellite/LNB, DiSEqC and TKGS options</string>
+    <string name="settings_tkgs_setup">TKGS channel setup</string>
+    <string name="settings_tkgs_setup_desc">Start channel setup with TKGS (DTVKit supported devices)</string>
     <string name="notif_permission_title">Notifications are required</string>
     <string name="notif_permission_body">Allow Makay Live TV notifications in Android settings to receive timer alerts. The timer was not scheduled.</string>
     <string name="notif_channel_timers">Timers</string>
@@ -227,6 +229,7 @@
     <string name="first_launch_setup_steps">First setup steps\n1. Open Setup / Channel scan.\n2. Select the satellite and enter LNB and DiSEqC settings for your installation. If unknown, use the tuner’s existing device settings.\n3. Start automatic or blind scan and wait for it to finish.\n4. Save and return to Live TV; found channels will appear automatically.\nMenu names may vary by device maker.</string>
     <string name="first_launch_continue">Get started</string>
     <string name="first_launch_open_setup">Open satellite / channel setup</string>
+    <string name="first_launch_tkgs_setup">Set up channels with TKGS</string>
     <string name="first_launch_status_tuner">Tuner</string>
     <string name="first_launch_status_channel">Channels</string>
     <string name="first_launch_status_input">Input</string>
