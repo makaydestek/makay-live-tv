@@ -76,6 +76,10 @@
     <string name="settings_about">About</string>
     <string name="settings_about_app">Makay Live TV</string>
     <string name="settings_installed_version_desc">Installed app version and build number</string>
+    <string name="settings_about_version">Version: %1$s (%2$d)</string>
+    <string name="settings_about_developer">Developer</string>
+    <string name="settings_about_developer_credit">Designed and developed by Murat AKAY.</string>
+    <string name="settings_about_copyright">© 2026 All rights reserved. Prepared for sideload / local distribution.</string>
     <string name="update_status_current">Update status has not been checked. Select Check updates.</string>
     <string name="channel_quick_access_hint">Right: filter/sort · Down: return to channels</string>
     <string name="channel_edit_keys_hint">OK: channel actions · Hold OK: move</string>

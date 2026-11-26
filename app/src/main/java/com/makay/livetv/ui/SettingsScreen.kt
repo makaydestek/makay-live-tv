@@ -16,6 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -45,7 +49,6 @@ import com.makay.livetv.BuildConfig
 import com.makay.livetv.R
 import com.makay.livetv.domain.model.TunerAvailability
 import com.makay.livetv.ui.theme.MakayPrimary
-import com.makay.livetv.ui.theme.OverlaySurface
 import com.makay.livetv.ui.theme.ThemeMode
 
 /** Ayarlar ekrani — bolumler ve degerler tek sutunda, DPAD ile gezinilir. */
@@ -228,12 +231,6 @@ fun SettingsScreen(
 
         Section(stringResource(R.string.section_maintenance))
         SettingRow(
-            title = stringResource(R.string.update_settings_title),
-            subtitle = updateStatus ?: stringResource(R.string.update_settings_desc),
-        ) {
-            ActionButton(stringResource(R.string.update_check_button), onCheckUpdates)
-        }
-        SettingRow(
             title = stringResource(R.string.channel_backup_title),
             subtitle = stringResource(R.string.channel_backup_desc),
         ) {
@@ -316,15 +313,48 @@ fun SettingsScreen(
         }
 
         Section(stringResource(R.string.settings_about))
-        SettingRow(
-            title = stringResource(R.string.settings_about_app),
-            subtitle = stringResource(R.string.settings_installed_version_desc),
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
-            Text(
-                text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                color = Color(0xFF8FA6C8),
-                fontSize = 15.sp,
-            )
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_about_app),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.settings_about_developer),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.settings_about_developer_credit),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.settings_about_copyright),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                )
+            }
         }
         SettingRow(
             title = stringResource(R.string.update_settings_title),
@@ -490,7 +520,7 @@ private fun SegmentedOption(
         modifier = Modifier
             .clip(RoundedCornerShape(18.dp))
             .background(if (selected) MakayPrimary else Color(0xFF1A1F29))
-            .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(18.dp))
+            .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(18.dp))
             .onFocusChanged { focused = it.isFocused }
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .tvClickable(interaction, onClick = onClick)
@@ -512,8 +542,8 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (focused) OverlaySurface else Color(0xFF1A1F29))
-            .border(2.dp, if (focused) MakayPrimary else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (focused) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF1A1F29))
+            .border(3.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(8.dp))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(interaction, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 8.dp),
@@ -525,11 +555,24 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
 @Composable
 private fun TvSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val interaction = rememberTvInteractionSource()
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        interactionSource = interaction,
-    )
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (focused) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+            .border(
+                width = if (focused) 3.dp else 0.dp,
+                color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(8.dp),
+            ),
+    ) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            interactionSource = interaction,
+            modifier = Modifier.onFocusChanged { focused = it.isFocused },
+        )
+    }
 }
 
 @Composable

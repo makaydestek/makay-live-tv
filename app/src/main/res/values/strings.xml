@@ -82,6 +82,10 @@
     <string name="settings_about">Hakkında</string>
     <string name="settings_about_app">Makay Live TV</string>
     <string name="settings_installed_version_desc">Kurulu uygulama sürümü ve derleme numarası</string>
+    <string name="settings_about_version">Sürüm: %1$s (%2$d)</string>
+    <string name="settings_about_developer">Geliştirici</string>
+    <string name="settings_about_developer_credit">Bu uygulamanın tasarımı ve geliştirmesi Murat AKAY tarafından yapılmıştır.</string>
+    <string name="settings_about_copyright">© 2026 Tüm hakları saklıdır. Sideload / yerel dağıtım için hazırlanmıştır.</string>
     <string name="update_status_current">Güncelleme durumu doğrulanmadı. Denetle’ye basın.</string>
     <string name="channel_quick_access_hint">Sağ: filtre/sıralama · Aşağı: kanallara dön</string>
     <string name="channel_edit_keys_hint">OK: kanal işlemleri · OK basılı: taşı</string>
